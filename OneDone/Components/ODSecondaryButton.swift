@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ODPrimaryButton: View {
+struct ODSecondaryButton: View {
     let title: String
     var icon: String? = nil
     var isDisabled: Bool = false
@@ -13,16 +13,21 @@ struct ODPrimaryButton: View {
                 if let icon {
                     Image(systemName: icon)
                 }
+
                 Text(title)
                     .font(OneDoneStyle.subheadlineFont.weight(.semibold))
             }
-            .foregroundStyle(ODColor.primaryContrast)
+            .foregroundStyle(isDisabled ? ODColor.textMuted : ODColor.primary)
             .padding(.vertical, OneDoneStyle.buttonVerticalPadding)
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .padding(.horizontal, fullWidth ? 0 : 14)
             .background(
                 RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .fill(isDisabled ? ODColor.primary.opacity(0.45) : ODColor.primary)
+                    .fill(ODColor.surfaceStrong)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
+                    .stroke(isDisabled ? ODColor.border.opacity(0.6) : ODColor.border, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)
@@ -32,9 +37,9 @@ struct ODPrimaryButton: View {
 
 #Preview {
     VStack(spacing: 12) {
-        ODPrimaryButton(title: "Continue", icon: "arrow.right.circle.fill") {}
-        ODPrimaryButton(title: "Inline", icon: "checkmark", fullWidth: false) {}
-        ODPrimaryButton(title: "Disabled", isDisabled: true) {}
+        ODSecondaryButton(title: "Back", icon: "chevron.left", fullWidth: false) {}
+        ODSecondaryButton(title: "Open Task", icon: "arrow.right") {}
+        ODSecondaryButton(title: "Disabled", isDisabled: true) {}
     }
     .padding()
     .oneDoneScreen()

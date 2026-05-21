@@ -4,21 +4,24 @@ struct StarterAccessIntroView: View {
     let onContinue: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: OneDoneStyle.sectionSpacing) {
             ODSectionHeader(title: "Starter Access", subtitle: "Your first 3 days")
 
             ODCard {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Start simple")
-                        .font(.headline)
+                        .font(OneDoneStyle.cardTitleFont)
                         .foregroundStyle(ODColor.primary)
 
                     Text("After onboarding, you unlock 3-day Starter Access. Once it is complete, the App Store 14-day trial becomes available.")
+                        .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
 
-                    Text("This prototype uses local mock state only.")
-                        .font(.footnote)
-                        .foregroundStyle(ODColor.textSecondary)
+                    ODInfoBanner(
+                        title: "Mock prototype",
+                        message: "This version uses local mock state only.",
+                        icon: "checkmark.shield"
+                    )
                 }
             }
 

@@ -6,7 +6,7 @@ struct TemplatesView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Templates",
                     subtitle: "Quick text starters"
@@ -17,19 +17,17 @@ struct TemplatesView: View {
                         NewTaskView(appState: appState, prefilledPrompt: template.promptHint, selectedTemplate: template)
                     } label: {
                         ODCard {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                                 Text(template.title)
-                                    .font(.headline)
+                                    .font(OneDoneStyle.cardTitleFont)
                                     .foregroundStyle(ODColor.textPrimary)
 
                                 Text(template.promptHint)
-                                    .font(.subheadline)
+                                    .font(OneDoneStyle.subheadlineFont)
                                     .foregroundStyle(ODColor.textSecondary)
                                     .lineLimit(3)
 
-                                Text("Focus: \(template.focus)")
-                                    .font(.caption)
-                                    .foregroundStyle(ODColor.primary)
+                                ODStatusBadge(title: "Focus: \(template.focus)", tone: .neutral)
                             }
                         }
                     }
