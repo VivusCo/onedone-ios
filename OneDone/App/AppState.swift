@@ -103,6 +103,14 @@ final class AppState {
         starterAccessStarted && starterAccessDaysUsed >= starterAccessDaysTotal
     }
 
+    var hasExpiredStarterAccess: Bool {
+        starterAccessStarted && starterDaysRemaining == 0 && !appStoreTrialActivated
+    }
+
+    var hasActiveTemplateAccess: Bool {
+        !hasExpiredStarterAccess
+    }
+
     var accessSummary: String {
         if !starterAccessStarted {
             return "Starter Access has not started yet."
