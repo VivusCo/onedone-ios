@@ -186,43 +186,52 @@ struct TaskDetailView: View {
                         .foregroundStyle(ODColor.textSecondary)
                 }
 
-                VStack(spacing: OneDoneStyle.contentSpacing) {
-                    ODSecondaryButton(
-                        title: "Tomorrow",
-                        icon: "sun.max",
-                        isDisabled: isReminderActionInProgress
-                    ) {
-                        scheduleReminder(task, afterDays: 1, context: "Reminder scheduled for tomorrow.")
-                    }
-
-                    ODSecondaryButton(
-                        title: "In 2 days",
-                        icon: "calendar.badge.plus",
-                        isDisabled: isReminderActionInProgress
-                    ) {
-                        scheduleReminder(task, afterDays: 2, context: "Reminder scheduled for 2 days from now.")
-                    }
-
-                    ODSecondaryButton(
-                        title: "In 3 days",
-                        icon: "calendar.badge.plus",
-                        isDisabled: isReminderActionInProgress
-                    ) {
-                        scheduleReminder(task, afterDays: 3, context: "Reminder scheduled for 3 days from now.")
-                    }
-
-                    ODSecondaryButton(
-                        title: "Choose date",
-                        icon: "calendar",
-                        isDisabled: isReminderActionInProgress
-                    ) {
-                        customReminderDate = max(task.reminderDate ?? Date().addingTimeInterval(86_400), Date())
-                        showCustomDatePicker = true
-                    }
-                }
-
-                if task.reminderDate != nil {
+                if task.reminderDate == nil {
                     VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ODSecondaryButton(
+                            title: "Tomorrow",
+                            icon: "sun.max",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            scheduleReminder(task, afterDays: 1, context: "Reminder scheduled for tomorrow.")
+                        }
+
+                        ODSecondaryButton(
+                            title: "In 2 days",
+                            icon: "calendar.badge.plus",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            scheduleReminder(task, afterDays: 2, context: "Reminder scheduled for 2 days from now.")
+                        }
+
+                        ODSecondaryButton(
+                            title: "In 3 days",
+                            icon: "calendar.badge.plus",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            scheduleReminder(task, afterDays: 3, context: "Reminder scheduled for 3 days from now.")
+                        }
+
+                        ODSecondaryButton(
+                            title: "Choose date",
+                            icon: "calendar",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            customReminderDate = max(Date().addingTimeInterval(86_400), Date())
+                            showCustomDatePicker = true
+                        }
+                    }
+                } else {
+                    VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ODSecondaryButton(
+                            title: "Reschedule",
+                            icon: "calendar.badge.clock",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            customReminderDate = max(task.reminderDate ?? Date().addingTimeInterval(86_400), Date())
+                            showCustomDatePicker = true
+                        }
+
                         ODSecondaryButton(
                             title: "Snooze +1 hour",
                             icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",

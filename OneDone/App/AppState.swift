@@ -135,14 +135,6 @@ final class AppState {
         starterAccessStarted && starterAccessDaysUsed >= starterAccessDaysTotal
     }
 
-    var hasExpiredStarterAccess: Bool {
-        mockAccessState == .starter_expired
-    }
-
-    var hasActiveTemplateAccess: Bool {
-        canCreateNewTasks
-    }
-
     var canCreateNewTasks: Bool {
         switch mockAccessState {
         case .starter_active, .trial_active, .subscription_active:
