@@ -17,6 +17,8 @@ struct AppFlow: View {
                 OnboardingView(
                     page: appState.currentOnboardingPage,
                     progressText: appState.onboardingProgressText,
+                    currentStep: appState.onboardingPageIndex,
+                    totalSteps: appState.onboardingPages.count,
                     canGoBack: appState.onboardingPageIndex > 0,
                     onBack: { appState.previousOnboardingPage() },
                     onNext: { appState.nextOnboardingPage() }

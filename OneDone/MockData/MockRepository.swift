@@ -75,8 +75,8 @@ enum MockRepository {
                     date: Date().addingTimeInterval(-28 * 3_600)
                 ),
                 TaskTimelineEntry(
-                    title: "Awaiting proof upload",
-                    detail: "Capture cancellation evidence before next billing date.",
+                    title: "Awaiting proof capture",
+                    detail: "Save cancellation evidence before next billing date.",
                     date: Date().addingTimeInterval(-6 * 3_600)
                 )
             ]
@@ -175,14 +175,14 @@ enum MockRepository {
             ]
         ),
         MockTask(
-            title: "Insurance document upload",
+            title: "Insurance document summary",
             category: "Admin",
-            prompt: "Need to submit proof of address for policy update.",
-            clarification: "Use latest utility bill PDF",
-            generatedReply: "Prepare the document, upload it from the insurer portal, and save confirmation.",
+            prompt: "Need to share proof of address details for a policy update.",
+            clarification: "Paste key text from the latest utility bill",
+            generatedReply: "Summarize the document text clearly, then share it in the insurer message form and save confirmation.",
             actionPlan: [
-                "Rename and prepare proof document",
-                "Upload in insurer portal",
+                "Paste key address details into a clean note",
+                "Share the summary in insurer message form",
                 "Save submission confirmation"
             ],
             createdAt: Date().addingTimeInterval(-2 * 86_400),

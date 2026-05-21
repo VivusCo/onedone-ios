@@ -31,12 +31,18 @@ struct HomeView: View {
                 mainInputCard
 
                 if appState.showsAccessGateForCreation {
-                    ODInfoBanner(
-                        title: "Creation is locked",
-                        message: "You can still view existing tasks and details. New task creation is gated in this access state.",
-                        icon: "lock.fill",
-                        tone: .warning
-                    )
+                    VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ODInfoBanner(
+                            title: "Creation is locked",
+                            message: "You can still view existing tasks and details. New task creation is gated in this access state.",
+                            icon: "lock.fill",
+                            tone: .warning
+                        )
+
+                        ODSecondaryButton(title: "Open access options", icon: "lock.open") {
+                            showSubscriptionGate = true
+                        }
+                    }
                 }
 
                 quickActionsSection
@@ -192,11 +198,11 @@ struct HomeView: View {
         case "Request a refund":
             generatedHint = "Write a calm refund request that explains the issue and asks for a timeline."
         case "Understand a bill":
-            generatedHint = "Help me understand this bill line-by-line and identify anything unusual."
+            generatedHint = "Paste the bill text and help me understand each charge in plain language."
         case "Write a complaint":
             generatedHint = "Draft a respectful complaint message with clear facts and a desired outcome."
         case "Reply to a message":
-            generatedHint = "Draft a concise reply to this message with a clear next step."
+            generatedHint = "Paste the message text and draft a concise reply with one clear next step."
         default:
             generatedHint = "Help me with this task."
         }
