@@ -44,6 +44,8 @@ final class AppState {
     var selectedTab: AppTab = .home
 
     var onboardingPageIndex: Int = 0
+    var hasCompletedOnboarding: Bool = false
+    var hasViewedStarterIntro: Bool = false
     let onboardingPages: [OnboardingPage] = [
         OnboardingPage(
             title: "OneDone keeps it simple",
@@ -112,6 +114,7 @@ final class AppState {
 
     func nextOnboardingPage() {
         guard onboardingPageIndex < onboardingPages.count - 1 else {
+            hasCompletedOnboarding = true
             phase = .starterIntro
             return
         }
@@ -126,6 +129,10 @@ final class AppState {
 
     func goToAccessGate() {
         phase = .access
+    }
+
+    func completeStarterIntro() {
+        hasViewedStarterIntro = true
     }
 
     func startStarterAccess() {
@@ -143,6 +150,7 @@ final class AppState {
     }
 
     func enterMainApp() {
+        completeStarterIntro()
         startStarterAccess()
         phase = .main
     }
