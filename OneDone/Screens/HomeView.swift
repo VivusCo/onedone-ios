@@ -6,6 +6,8 @@ struct HomeView: View {
 
     @State private var taskInput: String = ""
     @State private var showNewTaskFromInput: Bool = false
+    @State private var selectedQuickActionTemplate: TaskTemplate?
+    @State private var showSubscriptionGate: Bool = false
 
     private let quickActionLabels: [String] = [
         "Cancel a subscription",
@@ -36,6 +38,21 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showNewTaskFromInput) {
             NewTaskView(appState: appState, prefilledPrompt: taskInput.isBlank ? nil : taskInput)
+        }
+        .navigationDestination(item: $selectedQuickActionTemplate) { template in
+            NewTaskView(
+                appState: appState,
+                prefilledPrompt: template.promptHint,
+                selectedTemplate: template
+            )
+        }
+        .sheet(isPresented: $showSubscriptionGate) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showSubscriptionGate = false
+            }
         }
         .oneDoneScreen()
     }
@@ -104,7 +121,11 @@ struct HomeView: View {
                         icon: "arrow.right",
                         fullWidth: false
                     ) {
-                        showNewTaskFromInput = true
+                        if appState.canCreateNewTasks {
+                            showNewTaskFromInput = true
+                        } else {
+                            showSubscriptionGate = true
+                        }
                     }
                 }
             }
@@ -119,8 +140,12 @@ struct HomeView: View {
 
             ForEach(quickActionLabels, id: \.self) { label in
                 if let template = template(for: label) {
-                    NavigationLink {
-                        NewTaskView(appState: appState, prefilledPrompt: template.promptHint, selectedTemplate: template)
+                    Button {
+                        if appState.canCreateNewTasks {
+                            selectedQuickActionTemplate = template
+                        } else {
+                            showSubscriptionGate = true
+                        }
                     } label: {
                         ODCard(contentPadding: 14) {
                             HStack {
