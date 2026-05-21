@@ -2,6 +2,14 @@
 
 You are working on the native iOS app only.
 
+Documentation workflow (source of truth is local `/docs` copies):
+- Read relevant docs before implementation work.
+- For iOS product/UI/flow work, read `docs/01_ios_app_spec_v6.md`.
+- For MVP scope and build order, read `docs/03_mvp_implementation_plan_v2.md`.
+- For backend integration/API work, read `docs/04_api_contract.md`.
+- For QA/review tasks, read `docs/06_test_cases.md`.
+- If a prompt conflicts with docs, stop and ask.
+
 Tech stack:
 - SwiftUI
 - iOS 17+
