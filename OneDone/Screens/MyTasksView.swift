@@ -3,44 +3,37 @@ import Observation
 
 struct MyTasksView: View {
     @Bindable var appState: AppState
+    @State private var selectedFilter: MyTasksFilter = .all
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(title: "My Tasks", subtitle: "Local mock history")
+                ODSectionHeader(
+                    title: "My Tasks",
+                    subtitle: "Follow-through hub for active tasks"
+                )
 
-                if appState.tasks.isEmpty {
+                ODInfoBanner(
+                    title: "Stay in motion",
+                    message: "Prioritized by what needs your attention first.",
+                    icon: "checklist",
+                    tone: .highlight
+                )
+
+                filterBar
+
+                if filteredAndSortedTasks.isEmpty {
                     ODCard {
-                        Text("No tasks yet. Create one from Home.")
+                        Text(emptyStateText)
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 } else {
-                    ForEach(appState.tasks) { task in
+                    ForEach(filteredAndSortedTasks) { task in
                         NavigationLink {
                             TaskDetailView(task: task)
                         } label: {
-                            ODCard {
-                                VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                                    HStack(alignment: .center) {
-                                        Text(task.title)
-                                            .font(OneDoneStyle.cardTitleFont)
-                                            .foregroundStyle(ODColor.textPrimary)
-
-                                        Spacer()
-
-                                        ODStatusBadge(
-                                            title: task.status.rawValue,
-                                            tone: tone(for: task.status)
-                                        )
-                                    }
-
-                                    Text(task.generatedReply)
-                                        .font(OneDoneStyle.subheadlineFont)
-                                        .foregroundStyle(ODColor.textSecondary)
-                                        .lineLimit(2)
-                                }
-                            }
+                            taskCard(task)
                         }
                         .buttonStyle(.plain)
                     }
@@ -53,18 +46,156 @@ struct MyTasksView: View {
         .oneDoneScreen()
     }
 
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: OneDoneStyle.tightSpacing) {
+                ForEach(MyTasksFilter.allCases) { filter in
+                    Button {
+                        selectedFilter = filter
+                    } label: {
+                        Text(filter.rawValue)
+                            .font(OneDoneStyle.captionFont.weight(.semibold))
+                            .foregroundStyle(
+                                selectedFilter == filter ? ODColor.primaryContrast : ODColor.textPrimary
+                            )
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(selectedFilter == filter ? ODColor.primary : ODColor.surfaceStrong)
+                            )
+                            .overlay(
+                                Capsule(style: .continuous)
+                                    .stroke(ODColor.border, lineWidth: selectedFilter == filter ? 0 : 1)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func taskCard(_ task: MockTask) -> some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(task.title)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
+                            .lineLimit(2)
+
+                        Text(task.category)
+                            .font(OneDoneStyle.captionFont.weight(.medium))
+                            .foregroundStyle(ODColor.textMuted)
+                    }
+
+                    Spacer()
+
+                    ODStatusBadge(
+                        title: task.status.displayTitle,
+                        tone: tone(for: task.status)
+                    )
+                }
+
+                if let scheduleText = scheduleText(for: task) {
+                    Label(scheduleText, systemImage: "calendar")
+                        .font(OneDoneStyle.captionFont)
+                        .foregroundStyle(ODColor.textSecondary)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    previewLine(title: "Next", text: task.currentNextStep)
+                    previewLine(title: "Last", text: task.lastEventPreview)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func previewLine(title: String, text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("\(title):")
+                .font(OneDoneStyle.captionFont.weight(.semibold))
+                .foregroundStyle(ODColor.textSecondary)
+            Text(text)
+                .font(OneDoneStyle.captionFont)
+                .foregroundStyle(ODColor.textSecondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var filteredAndSortedTasks: [MockTask] {
+        let filtered = appState.tasks.filter { selectedFilter.matches($0.status) }
+        return filtered.sorted { lhs, rhs in
+            if lhs.status.sortPriority != rhs.status.sortPriority {
+                return lhs.status.sortPriority < rhs.status.sortPriority
+            }
+
+            let lhsDate = lhs.reminderDate ?? lhs.dueDate
+            let rhsDate = rhs.reminderDate ?? rhs.dueDate
+
+            switch (lhsDate, rhsDate) {
+            case let (left?, right?):
+                if left != right {
+                    return left < right
+                }
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                break
+            }
+
+            return lhs.createdAt > rhs.createdAt
+        }
+    }
+
+    private var emptyStateText: String {
+        if selectedFilter == .all {
+            return "No tasks yet. Create one from Home."
+        }
+        return "No tasks in \(selectedFilter.rawValue) right now."
+    }
+
+    private func scheduleText(for task: MockTask) -> String? {
+        if let reminderDate = task.reminderDate {
+            return "Reminder \(dateFormatter.string(from: reminderDate))"
+        }
+        if let dueDate = task.dueDate {
+            return "Due \(dateFormatter.string(from: dueDate))"
+        }
+        return nil
+    }
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }
+
     private func tone(for status: TaskStatus) -> ODStatusTone {
         switch status {
-        case .done:
-            return .success
-        case .ready:
-            return .highlight
-        case .inProgress:
-            return .neutral
+        case .followUpNeeded:
+            return .warning
+        case .dueSoon:
+            return .warning
         case .needsClarification:
             return .warning
-        case .draft:
-            return .warning
+        case .waitingForReply:
+            return .neutral
+        case .inProgress:
+            return .neutral
+        case .new, .ready, .draft:
+            return .highlight
+        case .postponed:
+            return .neutral
+        case .done:
+            return .success
         }
     }
 }
