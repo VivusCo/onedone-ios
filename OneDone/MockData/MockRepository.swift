@@ -12,19 +12,34 @@ enum MockRepository {
 
     static let templates: [TaskTemplate] = [
         TaskTemplate(
-            title: "Follow-up email",
-            promptHint: "Write a polite follow-up for yesterday's product demo. Mention one key benefit and propose two time slots.",
-            focus: "Clear and professional"
+            title: "Cancel a subscription",
+            promptHint: "Help me cancel this subscription and ask for written confirmation that billing will stop.",
+            focus: "Clear cancellation steps"
         ),
         TaskTemplate(
-            title: "Weekly planning",
-            promptHint: "Plan my week around three priorities: launch prep, customer calls, and personal admin.",
-            focus: "Balanced workload"
+            title: "Return an item",
+            promptHint: "Write a return request for this purchase, including order details and preferred resolution.",
+            focus: "Simple return request"
         ),
         TaskTemplate(
-            title: "Boundary-setting reply",
-            promptHint: "Draft a calm response that declines extra scope this week while offering an alternative timeline.",
-            focus: "Respectful boundaries"
+            title: "Request a refund",
+            promptHint: "Draft a polite refund request with clear facts and a direct ask.",
+            focus: "Calm refund message"
+        ),
+        TaskTemplate(
+            title: "Understand a bill",
+            promptHint: "Paste the bill text and help me understand each charge in plain language.",
+            focus: "Paste the bill text"
+        ),
+        TaskTemplate(
+            title: "Write a complaint",
+            promptHint: "Draft a respectful complaint that states the issue, impact, and requested fix.",
+            focus: "Firm but respectful tone"
+        ),
+        TaskTemplate(
+            title: "Reply to a message",
+            promptHint: "Paste the message text and draft a concise reply with one clear next step.",
+            focus: "Clear next step"
         )
     ]
 
