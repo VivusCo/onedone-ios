@@ -1,7 +1,13 @@
 import SwiftUI
+import Observation
 
 struct TaskDetailView: View {
-    let task: MockTask
+    @Bindable var appState: AppState
+    let taskID: UUID
+
+    private var task: MockTask? {
+        appState.task(for: taskID)
+    }
 
     var body: some View {
         ScrollView {
@@ -11,18 +17,26 @@ struct TaskDetailView: View {
                     subtitle: "Keep momentum with clear next steps"
                 )
 
-                headerSection
-                statusSection
-                nextStepSection
-                checklistSection
-                latestOutputSection
+                if let task {
+                    headerSection(task)
+                    statusSection(task)
+                    nextStepSection(task)
+                    checklistSection(task)
+                    latestOutputSection(task)
 
-                if let replyDraft = task.replyDraft, !replyDraft.isEmpty {
-                    replyDraftSection(replyDraft)
+                    if let replyDraft = task.replyDraft, !replyDraft.isEmpty {
+                        replyDraftSection(task, replyDraft: replyDraft)
+                    }
+
+                    reminderSection(task)
+                    timelineSection(task)
+                } else {
+                    ODCard {
+                        Text("Task no longer exists in mock state.")
+                            .font(OneDoneStyle.bodyFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
                 }
-
-                reminderSection
-                timelineSection
             }
             .padding(OneDoneStyle.screenPadding)
         }
@@ -31,7 +45,7 @@ struct TaskDetailView: View {
         .oneDoneScreen()
     }
 
-    private var headerSection: some View {
+    private func headerSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Header")
@@ -51,7 +65,7 @@ struct TaskDetailView: View {
         }
     }
 
-    private var statusSection: some View {
+    private func statusSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Status")
@@ -59,7 +73,7 @@ struct TaskDetailView: View {
                 HStack {
                     ODStatusBadge(title: task.status.displayTitle, tone: tone(for: task.status))
                     Spacer()
-                    if let dateLabel = dueOrReminderText {
+                    if let dateLabel = dueOrReminderText(task) {
                         Text(dateLabel)
                             .font(OneDoneStyle.captionFont)
                             .foregroundStyle(ODColor.textSecondary)
@@ -69,7 +83,7 @@ struct TaskDetailView: View {
         }
     }
 
-    private var nextStepSection: some View {
+    private func nextStepSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Current next step")
@@ -80,7 +94,7 @@ struct TaskDetailView: View {
         }
     }
 
-    private var checklistSection: some View {
+    private func checklistSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Checklist")
@@ -106,7 +120,7 @@ struct TaskDetailView: View {
         }
     }
 
-    private var latestOutputSection: some View {
+    private func latestOutputSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Latest AI output")
@@ -118,18 +132,33 @@ struct TaskDetailView: View {
     }
 
     @ViewBuilder
-    private func replyDraftSection(_ replyDraft: String) -> some View {
+    private func replyDraftSection(_ task: MockTask, replyDraft: String) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Reply draft")
                 Text(replyDraft)
                     .font(OneDoneStyle.bodyFont)
                     .foregroundStyle(ODColor.textSecondary)
+
+                NavigationLink {
+                    DraftReplyView(appState: appState, taskID: task.id)
+                } label: {
+                    Text("Open Draft Reply")
+                        .font(OneDoneStyle.captionFont.weight(.semibold))
+                        .foregroundStyle(ODColor.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(ODColor.primarySoft)
+                        )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
 
-    private var reminderSection: some View {
+    private func reminderSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Reminder")
@@ -151,17 +180,17 @@ struct TaskDetailView: View {
         }
     }
 
-    private var timelineSection: some View {
+    private func timelineSection(_ task: MockTask) -> some View {
         ODCard {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Timeline")
 
-                if compactTimeline.isEmpty {
+                if compactTimeline(for: task).isEmpty {
                     Text("No timeline events yet.")
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
                 } else {
-                    ForEach(compactTimeline) { entry in
+                    ForEach(compactTimeline(for: task)) { entry in
                         VStack(alignment: .leading, spacing: 3) {
                             HStack(alignment: .firstTextBaseline) {
                                 Text(entry.title)
@@ -183,14 +212,14 @@ struct TaskDetailView: View {
         }
     }
 
-    private var compactTimeline: [TaskTimelineEntry] {
+    private func compactTimeline(for task: MockTask) -> [TaskTimelineEntry] {
         task.timeline
             .sorted { $0.date > $1.date }
             .prefix(3)
             .map { $0 }
     }
 
-    private var dueOrReminderText: String? {
+    private func dueOrReminderText(_ task: MockTask) -> String? {
         if let reminderDate = task.reminderDate {
             return "Reminder \(dateFormatter.string(from: reminderDate))"
         }
@@ -244,6 +273,7 @@ struct TaskDetailView: View {
 
 #Preview {
     NavigationStack {
-        TaskDetailView(task: MockRepository.seedTasks[0])
+        let appState = AppState()
+        TaskDetailView(appState: appState, taskID: appState.tasks[0].id)
     }
 }

@@ -175,4 +175,46 @@ final class AppState {
         guard !tasks.contains(where: { $0.id == task.id }) else { return }
         tasks.insert(task, at: 0)
     }
+
+    func task(for id: UUID) -> MockTask? {
+        tasks.first(where: { $0.id == id })
+    }
+
+    func markTaskWaitingForReply(_ taskID: UUID, sentMessage: String) {
+        updateTask(taskID) { task in
+            task.status = .waitingForReply
+            task.replyDraft = sentMessage
+            task.latestAIOutput = "Message sent. Wait for a response before the follow-up reminder."
+            task.currentNextStep = "Wait for reply, then follow up if needed."
+            task.lastEventPreview = "Reply sent. Waiting for response."
+            task.timeline.append(
+                TaskTimelineEntry(
+                    title: "Reply sent",
+                    detail: "Status moved to Waiting for Reply.",
+                    date: Date()
+                )
+            )
+        }
+    }
+
+    func setTaskReminder(_ taskID: UUID, afterHours hours: Int, context: String) {
+        let reminderDate = Calendar.current.date(byAdding: .hour, value: max(1, hours), to: Date())
+
+        updateTask(taskID) { task in
+            task.reminderDate = reminderDate
+            task.lastEventPreview = "Reminder set."
+            task.timeline.append(
+                TaskTimelineEntry(
+                    title: "Reminder set",
+                    detail: context,
+                    date: Date()
+                )
+            )
+        }
+    }
+
+    private func updateTask(_ taskID: UUID, update: (inout MockTask) -> Void) {
+        guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
+        update(&tasks[index])
+    }
 }

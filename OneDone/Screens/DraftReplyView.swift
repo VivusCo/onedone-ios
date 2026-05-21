@@ -1,50 +1,61 @@
 import SwiftUI
 import Observation
+import UIKit
 
 struct DraftReplyView: View {
     @Bindable var appState: AppState
-    let draft: TaskDraft
+    let taskID: UUID
 
-    @State private var finalizedTask: MockTask?
-    @State private var showResult: Bool = false
+    @State private var subject: String = ""
+    @State private var messageBody: String = ""
+    @State private var selectedTone: ReplyTone = .polite
+    @State private var selectedLanguage: ReplyLanguage = .auto
+    @State private var didCopy: Bool = false
+    @State private var showPostCopyPrompt: Bool = false
+    @State private var showFollowUpReminderFlow: Bool = false
+    @State private var reminderConfirmation: String?
+
+    private var task: MockTask? {
+        appState.task(for: taskID)
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Draft Reply",
-                    subtitle: "Mock generated text"
+                    subtitle: "Review, copy, and track follow-up"
                 )
 
-                ODCard {
-                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text("Reply Draft")
-                            .font(OneDoneStyle.cardTitleFont)
-                            .foregroundStyle(ODColor.textPrimary)
+                if let task {
+                    subjectSection(task: task)
+                    messageBodySection
+                    toneSection
+                    languageSection
+                    actionsSection
 
-                        Text(draft.generatedReply)
+                    if showPostCopyPrompt {
+                        postCopyPromptSection
+                    }
+
+                    if showFollowUpReminderFlow {
+                        followUpReminderSection
+                    }
+
+                    if let reminderConfirmation {
+                        ODInfoBanner(
+                            title: "Reminder saved",
+                            message: reminderConfirmation,
+                            icon: "checkmark.circle.fill",
+                            tone: .success
+                        )
+                    }
+                } else {
+                    ODCard {
+                        Text("Task no longer exists in mock state.")
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
-                }
-
-                ODCard {
-                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text("Action Plan")
-                            .font(OneDoneStyle.cardTitleFont)
-                            .foregroundStyle(ODColor.textPrimary)
-
-                        ForEach(Array(draft.actionPlan.enumerated()), id: \.offset) { index, item in
-                            Text("\(index + 1). \(item)")
-                                .font(OneDoneStyle.bodyFont)
-                                .foregroundStyle(ODColor.textSecondary)
-                        }
-                    }
-                }
-
-                ODPrimaryButton(title: "Finalize Task Result", icon: "checkmark.circle.fill") {
-                    finalizedTask = appState.finalizeTask(from: draft)
-                    showResult = true
                 }
             }
             .padding(OneDoneStyle.screenPadding)
@@ -52,19 +63,256 @@ struct DraftReplyView: View {
         .navigationTitle("Draft Reply")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
-        .navigationDestination(isPresented: $showResult) {
-            if let finalizedTask {
-                TaskResultView(appState: appState, task: finalizedTask)
+        .onAppear {
+            guard let task else { return }
+            if subject.isEmpty {
+                subject = makeDefaultSubject(for: task)
+            }
+            if messageBody.isEmpty {
+                messageBody = task.replyDraft ?? task.generatedReply
             }
         }
     }
+
+    private func subjectSection(task: MockTask) -> some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                cardTitle("Subject")
+                TextField("Subject", text: $subject)
+                    .font(OneDoneStyle.bodyFont)
+                    .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+                    .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+                    .background(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                            .fill(ODColor.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                            .stroke(ODColor.border, lineWidth: 1)
+                    )
+
+                Text(task.title)
+                    .font(OneDoneStyle.captionFont)
+                    .foregroundStyle(ODColor.textMuted)
+            }
+        }
+    }
+
+    private var messageBodySection: some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                cardTitle("Message body")
+                TextEditor(text: $messageBody)
+                    .font(OneDoneStyle.bodyFont)
+                    .frame(minHeight: 180)
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                            .fill(ODColor.surface)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                            .stroke(ODColor.border, lineWidth: 1)
+                    )
+            }
+        }
+    }
+
+    private var toneSection: some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                cardTitle("Tone")
+                Picker("Tone", selection: $selectedTone) {
+                    ForEach(ReplyTone.allCases) { tone in
+                        Text(tone.rawValue).tag(tone)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+        }
+    }
+
+    private var languageSection: some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                cardTitle("Language")
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ForEach(ReplyLanguage.allCases) { language in
+                            Button {
+                                selectedLanguage = language
+                            } label: {
+                                Text(language.rawValue)
+                                    .font(OneDoneStyle.captionFont.weight(.semibold))
+                                    .foregroundStyle(
+                                        selectedLanguage == language ? ODColor.primaryContrast : ODColor.textPrimary
+                                    )
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(selectedLanguage == language ? ODColor.primary : ODColor.surfaceStrong)
+                                    )
+                                    .overlay(
+                                        Capsule(style: .continuous)
+                                            .stroke(ODColor.border, lineWidth: selectedLanguage == language ? 0 : 1)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var actionsSection: some View {
+        VStack(spacing: OneDoneStyle.contentSpacing) {
+            ODPrimaryButton(
+                title: didCopy ? "Copied" : "Copy",
+                icon: didCopy ? "checkmark" : "doc.on.doc",
+                isDisabled: messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ) {
+                copyDraft()
+            }
+
+            ODSecondaryButton(title: "Regenerate mock", icon: "arrow.clockwise") {
+                regenerateMockDraft()
+            }
+        }
+    }
+
+    private var postCopyPromptSection: some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                Text("Did you send it?")
+                    .font(OneDoneStyle.cardTitleFont)
+                    .foregroundStyle(ODColor.textPrimary)
+
+                ODPrimaryButton(title: "Yes, I sent it", icon: "checkmark.circle.fill") {
+                    appState.markTaskWaitingForReply(taskID, sentMessage: messageBody)
+                    showPostCopyPrompt = false
+                    showFollowUpReminderFlow = true
+                    reminderConfirmation = nil
+                }
+
+                ODSecondaryButton(title: "Not yet", icon: "clock") {
+                    showPostCopyPrompt = false
+                }
+
+                ODSecondaryButton(title: "Remind me later", icon: "bell") {
+                    appState.setTaskReminder(
+                        taskID,
+                        afterHours: 3,
+                        context: "Reminder from Draft Reply: send this message."
+                    )
+                    reminderConfirmation = "We will remind you in about 3 hours to send this message."
+                    showPostCopyPrompt = false
+                }
+            }
+        }
+    }
+
+    private var followUpReminderSection: some View {
+        ODCard {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                Text("Set follow-up reminder")
+                    .font(OneDoneStyle.cardTitleFont)
+                    .foregroundStyle(ODColor.textPrimary)
+
+                Text("Choose when OneDone should remind you to check for a reply.")
+                    .font(OneDoneStyle.subheadlineFont)
+                    .foregroundStyle(ODColor.textSecondary)
+
+                HStack(spacing: OneDoneStyle.tightSpacing) {
+                    reminderButton(title: "Tomorrow", hours: 24)
+                    reminderButton(title: "In 2 days", hours: 48)
+                    reminderButton(title: "In 3 days", hours: 72)
+                }
+            }
+        }
+    }
+
+    private func reminderButton(title: String, hours: Int) -> some View {
+        Button {
+            appState.setTaskReminder(
+                taskID,
+                afterHours: hours,
+                context: "Follow-up reminder after sent reply."
+            )
+            reminderConfirmation = "Follow-up reminder set for \(title.lowercased())."
+        } label: {
+            Text(title)
+                .font(OneDoneStyle.captionFont.weight(.semibold))
+                .foregroundStyle(ODColor.primary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(ODColor.primarySoft)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func copyDraft() {
+        let composed = "Subject: \(subject)\n\n\(messageBody)"
+        UIPasteboard.general.string = composed
+        didCopy = true
+        showPostCopyPrompt = true
+        showFollowUpReminderFlow = false
+    }
+
+    private func regenerateMockDraft() {
+        messageBody = regenerateMessage(
+            base: messageBody,
+            tone: selectedTone,
+            language: selectedLanguage
+        )
+        didCopy = false
+    }
+
+    private func regenerateMessage(base: String, tone: ReplyTone, language: ReplyLanguage) -> String {
+        let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = trimmed.isEmpty ? "Could you help with this request?" : trimmed
+        let tonePrefix = "[\(tone.rawValue)]"
+        let languageSuffix = language == .auto ? "" : " (\(language.rawValue))"
+        return "\(tonePrefix)\(languageSuffix) \(source)"
+    }
+
+    private func makeDefaultSubject(for task: MockTask) -> String {
+        "Regarding: \(task.title)"
+    }
+
+    private func cardTitle(_ text: String) -> some View {
+        Text(text)
+            .font(OneDoneStyle.captionFont.weight(.semibold))
+            .foregroundStyle(ODColor.primary)
+    }
+}
+
+private enum ReplyTone: String, CaseIterable, Identifiable {
+    case polite = "Polite"
+    case firmer = "Firmer"
+    case shorter = "Shorter"
+
+    var id: String { rawValue }
+}
+
+private enum ReplyLanguage: String, CaseIterable, Identifiable {
+    case auto = "Auto"
+    case english = "English"
+    case russian = "Russian"
+    case ukrainian = "Ukrainian"
+    case romanian = "Romanian"
+
+    var id: String { rawValue }
 }
 
 #Preview {
     NavigationStack {
-        DraftReplyView(
-            appState: AppState(),
-            draft: MockRepository.makeDraft(prompt: "Write a calm weekly update", template: nil)
-        )
+        let appState = AppState()
+        DraftReplyView(appState: appState, taskID: appState.tasks[0].id)
     }
 }
