@@ -6,24 +6,26 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Home",
                     subtitle: "Guided, text-first flow"
                 )
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Welcome back")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         Text("Pick one task and move it forward with a calm, guided sequence.")
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
 
-                        Text("Starter days remaining: \(appState.starterDaysRemaining)")
-                            .font(.subheadline)
-                            .foregroundStyle(ODColor.primary)
+                        ODStatusBadge(
+                            title: "Starter days remaining: \(appState.starterDaysRemaining)",
+                            tone: .highlight
+                        )
                     }
                 }
 
@@ -34,10 +36,10 @@ struct HomeView: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("New Task")
-                                    .font(.headline)
+                                    .font(OneDoneStyle.cardTitleFont)
                                     .foregroundStyle(ODColor.textPrimary)
                                 Text("Create a task with local mock guidance")
-                                    .font(.subheadline)
+                                    .font(OneDoneStyle.subheadlineFont)
                                     .foregroundStyle(ODColor.textSecondary)
                             }
 
@@ -52,16 +54,17 @@ struct HomeView: View {
 
                 if let latest = appState.tasks.first {
                     ODCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                             Text("Latest task")
-                                .font(.caption.weight(.semibold))
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
                                 .foregroundStyle(ODColor.primary)
 
                             Text(latest.title)
-                                .font(.headline)
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
 
                             Text(latest.generatedReply)
-                                .font(.subheadline)
+                                .font(OneDoneStyle.subheadlineFont)
                                 .foregroundStyle(ODColor.textSecondary)
                                 .lineLimit(3)
                         }

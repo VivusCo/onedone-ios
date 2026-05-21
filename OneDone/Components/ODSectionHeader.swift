@@ -7,12 +7,12 @@ struct ODSectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(.title2, design: .rounded).weight(.semibold))
+                .font(OneDoneStyle.sectionTitleFont)
                 .foregroundStyle(ODColor.textPrimary)
 
             if let subtitle {
                 Text(subtitle)
-                    .font(.subheadline)
+                    .font(OneDoneStyle.subheadlineFont)
                     .foregroundStyle(ODColor.textSecondary)
             }
         }

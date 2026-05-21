@@ -6,22 +6,22 @@ struct ODTextField: View {
     @Binding var text: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
             Text(label)
-                .font(.subheadline.weight(.medium))
+                .font(OneDoneStyle.subheadlineFont.weight(.medium))
                 .foregroundStyle(ODColor.textPrimary)
 
             TextField(placeholder, text: $text, axis: .vertical)
                 .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+                .padding(.vertical, OneDoneStyle.controlVerticalPadding)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(.white)
+                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                        .fill(ODColor.surface)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(ODColor.cardBorder, lineWidth: 1)
+                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                        .stroke(ODColor.border, lineWidth: 1)
                 )
         }
     }

@@ -11,29 +11,23 @@ struct ClarificationView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Clarification",
                     subtitle: "One focused question"
                 )
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text(initialDraft.clarificationQuestion)
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        TextField("Type your answer", text: $clarificationAnswer, axis: .vertical)
-                            .textFieldStyle(.plain)
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(.white)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(ODColor.cardBorder, lineWidth: 1)
-                            )
+                        ODTextField(
+                            label: "Your answer",
+                            placeholder: "Type your answer",
+                            text: $clarificationAnswer
+                        )
                     }
                 }
 

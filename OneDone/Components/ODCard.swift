@@ -1,33 +1,36 @@
 import SwiftUI
 
 struct ODCard<Content: View>: View {
+    var contentPadding: CGFloat = OneDoneStyle.cardPadding
     private let content: Content
 
-    init(@ViewBuilder content: () -> Content) {
+    init(contentPadding: CGFloat = OneDoneStyle.cardPadding, @ViewBuilder content: () -> Content) {
+        self.contentPadding = contentPadding
         self.content = content()
     }
 
     var body: some View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
+            .padding(contentPadding)
             .background(
                 RoundedRectangle(cornerRadius: OneDoneStyle.cardCornerRadius, style: .continuous)
-                    .fill(ODColor.cardBackground)
+                    .fill(ODColor.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.cardCornerRadius, style: .continuous)
-                    .stroke(ODColor.cardBorder, lineWidth: 1)
+                    .stroke(ODColor.border, lineWidth: 1)
             )
     }
 }
 
 #Preview {
     ODCard {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
             Text("Card title")
-                .font(.headline)
+                .font(OneDoneStyle.cardTitleFont)
             Text("This is a calm, rounded card style used across the prototype.")
+                .font(OneDoneStyle.subheadlineFont)
                 .foregroundStyle(ODColor.textSecondary)
         }
     }

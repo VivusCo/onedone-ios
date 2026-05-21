@@ -10,30 +10,33 @@ struct DraftReplyView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Draft Reply",
                     subtitle: "Mock generated text"
                 )
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Reply Draft")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         Text(draft.generatedReply)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Action Plan")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
 
                         ForEach(Array(draft.actionPlan.enumerated()), id: \.offset) { index, item in
                             Text("\(index + 1). \(item)")
+                                .font(OneDoneStyle.bodyFont)
                                 .foregroundStyle(ODColor.textSecondary)
                         }
                     }

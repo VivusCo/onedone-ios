@@ -10,26 +10,30 @@ struct TaskResultView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(title: "Task Result", subtitle: "Ready to use")
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                         Text(task.title)
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
 
                         Text(task.generatedReply)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Suggested next steps")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
 
                         ForEach(Array(task.actionPlan.enumerated()), id: \.offset) { index, step in
                             Text("\(index + 1). \(step)")
+                                .font(OneDoneStyle.bodyFont)
                                 .foregroundStyle(ODColor.textSecondary)
                         }
                     }
@@ -44,12 +48,10 @@ struct TaskResultView: View {
                     didSave = true
                 }
 
-                Button("Open My Tasks tab") {
+                ODSecondaryButton(title: "Open My Tasks tab", icon: "list.bullet") {
                     appState.selectedTab = .tasks
                     dismiss()
                 }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ODColor.primary)
             }
             .padding(OneDoneStyle.screenPadding)
         }

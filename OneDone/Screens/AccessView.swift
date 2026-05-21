@@ -6,7 +6,7 @@ struct AccessView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Access",
                     subtitle: "Starter Access status and App Store trial gate (mock UI)"
@@ -14,13 +14,17 @@ struct AccessView: View {
 
                 ODCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        statusChip
+                        ODStatusBadge(
+                            title: accessStatusTitle,
+                            tone: accessStatusTone
+                        )
 
                         Text(appState.accessSummary)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
 
                         Text("Starter Access: \(appState.starterAccessDaysUsed)/\(appState.starterAccessDaysTotal) day(s) used")
-                            .font(.subheadline)
+                            .font(OneDoneStyle.subheadlineFont)
                             .foregroundStyle(ODColor.textPrimary)
                     }
                 }
@@ -28,7 +32,7 @@ struct AccessView: View {
                 ODCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Starter Access")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         ODPrimaryButton(
@@ -39,7 +43,7 @@ struct AccessView: View {
                             appState.startStarterAccess()
                         }
 
-                        ODPrimaryButton(
+                        ODSecondaryButton(
                             title: "Simulate Day Progress",
                             icon: "calendar.badge.plus",
                             isDisabled: !appState.starterAccessStarted || appState.starterDaysRemaining == 0
@@ -52,10 +56,11 @@ struct AccessView: View {
                 ODCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("App Store Trial Gate")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         Text("14-day trial unlocks after Starter Access is completed.")
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
 
                         ODPrimaryButton(
@@ -77,16 +82,21 @@ struct AccessView: View {
         .oneDoneScreen()
     }
 
-    private var statusChip: some View {
-        Text(appState.appStoreTrialActivated ? "Trial active" : (appState.isTrialEligible ? "Trial available" : "Starter access"))
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(ODColor.primarySoft)
-            )
-            .foregroundStyle(ODColor.primary)
+    private var accessStatusTitle: String {
+        if appState.appStoreTrialActivated {
+            return "Trial active"
+        }
+        if appState.isTrialEligible {
+            return "Trial available"
+        }
+        return "Starter access"
+    }
+
+    private var accessStatusTone: ODStatusTone {
+        if appState.appStoreTrialActivated {
+            return .success
+        }
+        return appState.isTrialEligible ? .highlight : .neutral
     }
 }
 

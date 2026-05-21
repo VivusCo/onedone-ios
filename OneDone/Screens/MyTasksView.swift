@@ -6,12 +6,13 @@ struct MyTasksView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(title: "My Tasks", subtitle: "Local mock history")
 
                 if appState.tasks.isEmpty {
                     ODCard {
                         Text("No tasks yet. Create one from Home.")
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 } else {
@@ -20,21 +21,22 @@ struct MyTasksView: View {
                             TaskDetailView(task: task)
                         } label: {
                             ODCard {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack {
+                                VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                                    HStack(alignment: .center) {
                                         Text(task.title)
-                                            .font(.headline)
+                                            .font(OneDoneStyle.cardTitleFont)
                                             .foregroundStyle(ODColor.textPrimary)
 
                                         Spacer()
 
-                                        Text(task.status.rawValue)
-                                            .font(.caption.weight(.medium))
-                                            .foregroundStyle(ODColor.primary)
+                                        ODStatusBadge(
+                                            title: task.status.rawValue,
+                                            tone: tone(for: task.status)
+                                        )
                                     }
 
                                     Text(task.generatedReply)
-                                        .font(.subheadline)
+                                        .font(OneDoneStyle.subheadlineFont)
                                         .foregroundStyle(ODColor.textSecondary)
                                         .lineLimit(2)
                                 }
@@ -49,6 +51,19 @@ struct MyTasksView: View {
         .navigationTitle("My Tasks")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+    }
+
+    private func tone(for status: TaskStatus) -> ODStatusTone {
+        switch status {
+        case .done:
+            return .success
+        case .ready:
+            return .highlight
+        case .inProgress:
+            return .neutral
+        case .draft:
+            return .warning
+        }
     }
 }
 

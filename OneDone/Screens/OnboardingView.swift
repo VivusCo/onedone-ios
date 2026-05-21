@@ -8,13 +8,13 @@ struct OnboardingView: View {
     let onNext: () -> Void
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: OneDoneStyle.sectionSpacing) {
             ODSectionHeader(title: "Onboarding", subtitle: progressText)
 
             ODCard {
                 VStack(alignment: .leading, spacing: 14) {
                     Text(page.subtitle.uppercased())
-                        .font(.caption.weight(.semibold))
+                        .font(OneDoneStyle.captionFont.weight(.semibold))
                         .foregroundStyle(ODColor.primary)
 
                     Text(page.title)
@@ -22,24 +22,23 @@ struct OnboardingView: View {
                         .foregroundStyle(ODColor.textPrimary)
 
                     Text(page.body)
+                        .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
                 }
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: OneDoneStyle.contentSpacing) {
                 Circle().fill(ODColor.primary.opacity(0.85)).frame(width: 7, height: 7)
                 Circle().fill(ODColor.primary.opacity(0.45)).frame(width: 7, height: 7)
                 Circle().fill(ODColor.primary.opacity(0.25)).frame(width: 7, height: 7)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 12) {
+            HStack(spacing: OneDoneStyle.contentSpacing) {
                 if canGoBack {
-                    Button("Back") {
+                    ODSecondaryButton(title: "Back", icon: "chevron.left", fullWidth: false) {
                         onBack()
                     }
-                    .buttonStyle(.bordered)
-                    .tint(ODColor.primary)
                 }
 
                 ODPrimaryButton(title: "Next", icon: "arrow.right.circle.fill") {

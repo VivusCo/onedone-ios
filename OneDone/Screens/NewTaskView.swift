@@ -12,7 +12,7 @@ struct NewTaskView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "New Task",
                     subtitle: "Describe one task in plain text"
@@ -20,40 +20,40 @@ struct NewTaskView: View {
 
                 if let selectedTemplate {
                     ODCard {
-                        VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                             Text("Template")
-                                .font(.caption.weight(.semibold))
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
                                 .foregroundStyle(ODColor.primary)
                             Text(selectedTemplate.title)
-                                .font(.headline)
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
                             Text(selectedTemplate.focus)
-                                .font(.subheadline)
+                                .font(OneDoneStyle.subheadlineFont)
                                 .foregroundStyle(ODColor.textSecondary)
                         }
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Task prompt")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         TextEditor(text: $prompt)
+                            .font(OneDoneStyle.bodyFont)
                             .frame(minHeight: 140)
                             .padding(8)
                             .background(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(.white)
+                                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                    .fill(ODColor.surface)
                             )
                             .overlay(
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .stroke(ODColor.cardBorder, lineWidth: 1)
+                                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                    .stroke(ODColor.border, lineWidth: 1)
                             )
 
-                        Text("Attachments: Coming soon")
-                            .font(.footnote)
-                            .foregroundStyle(ODColor.textSecondary)
+                        ODComingSoonBadge(text: "Attachments coming soon")
                     }
                 }
 

@@ -4,24 +4,24 @@ struct WelcomeView: View {
     let onGetStarted: () -> Void
 
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: OneDoneStyle.relaxedSpacing) {
             Spacer(minLength: 24)
 
             ODCard {
                 VStack(alignment: .leading, spacing: 14) {
                     Text("OneDone")
-                        .font(.system(size: 38, weight: .bold, design: .rounded))
+                        .font(OneDoneStyle.heroFont)
                         .foregroundStyle(ODColor.primary)
 
                     Text("A warm, guided self-service assistant for finishing one meaningful task at a time.")
-                        .font(.body)
+                        .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
 
-                    HStack(spacing: 10) {
+                    HStack(spacing: OneDoneStyle.contentSpacing) {
                         Label("Text-first MVP", systemImage: "text.alignleft")
                         Label("Calm workflow", systemImage: "leaf.fill")
                     }
-                    .font(.footnote)
+                    .font(OneDoneStyle.captionFont)
                     .foregroundStyle(ODColor.textSecondary)
                 }
             }

@@ -5,43 +5,51 @@ struct TaskDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(title: task.title, subtitle: task.status.rawValue)
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Original prompt")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
                         Text(task.prompt)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Clarification")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
                         Text(task.clarification)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Generated reply")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
                         Text(task.generatedReply)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Action plan")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
 
                         ForEach(Array(task.actionPlan.enumerated()), id: \.offset) { index, step in
                             Text("\(index + 1). \(step)")
+                                .font(OneDoneStyle.bodyFont)
                                 .foregroundStyle(ODColor.textSecondary)
                         }
                     }

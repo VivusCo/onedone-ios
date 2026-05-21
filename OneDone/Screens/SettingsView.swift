@@ -6,7 +6,7 @@ struct SettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(title: "Settings", subtitle: "Prototype controls")
 
                 ODCard {
@@ -15,25 +15,29 @@ struct SettingsView: View {
                         Toggle("Haptics", isOn: $appState.hapticsEnabled)
                         Toggle("Calm Mode", isOn: $appState.calmModeEnabled)
                     }
+                    .font(OneDoneStyle.bodyFont)
+                    .foregroundStyle(ODColor.textPrimary)
                     .tint(ODColor.primary)
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                         Text("Current access")
-                            .font(.headline)
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
                         Text(appState.accessSummary)
+                            .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Data source")
-                            .font(.headline)
-                        Text("All content in this prototype is local mock data. No Supabase, StoreKit, backend, or OpenAI calls are used.")
-                            .foregroundStyle(ODColor.textSecondary)
-                    }
+                    ODInfoBanner(
+                        title: "Local data only",
+                        message: "All content in this prototype is local mock data. No Supabase, StoreKit, backend, or OpenAI calls are used.",
+                        icon: "internaldrive.fill",
+                        tone: .success
+                    )
                 }
             }
             .padding(OneDoneStyle.screenPadding)
