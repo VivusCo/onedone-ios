@@ -3,6 +3,8 @@ import SwiftUI
 struct OnboardingView: View {
     let page: OnboardingPage
     let progressText: String
+    let currentStep: Int
+    let totalSteps: Int
     let canGoBack: Bool
     let onBack: () -> Void
     let onNext: () -> Void
@@ -28,9 +30,11 @@ struct OnboardingView: View {
             }
 
             HStack(spacing: OneDoneStyle.contentSpacing) {
-                Circle().fill(ODColor.primary.opacity(0.85)).frame(width: 7, height: 7)
-                Circle().fill(ODColor.primary.opacity(0.45)).frame(width: 7, height: 7)
-                Circle().fill(ODColor.primary.opacity(0.25)).frame(width: 7, height: 7)
+                ForEach(0..<max(1, totalSteps), id: \.self) { index in
+                    Circle()
+                        .fill(index == currentStep ? ODColor.primary.opacity(0.85) : ODColor.primary.opacity(0.28))
+                        .frame(width: 7, height: 7)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -57,6 +61,8 @@ struct OnboardingView: View {
     OnboardingView(
         page: OnboardingPage(title: "OneDone keeps it simple", subtitle: "Guided self-service", body: "Focus on one real task at a time."),
         progressText: "Step 1 of 3",
+        currentStep: 0,
+        totalSteps: 3,
         canGoBack: false,
         onBack: {},
         onNext: {}

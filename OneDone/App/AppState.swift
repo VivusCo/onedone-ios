@@ -186,10 +186,6 @@ final class AppState {
         onboardingPageIndex -= 1
     }
 
-    func goToAccessGate() {
-        phase = .access
-    }
-
     func completeStarterIntro() {
         hasViewedStarterIntro = true
     }
