@@ -61,6 +61,8 @@ struct MyTasksView: View {
             return .highlight
         case .inProgress:
             return .neutral
+        case .needsClarification:
+            return .warning
         case .draft:
             return .warning
         }

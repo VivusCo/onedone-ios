@@ -1,6 +1,15 @@
 import Foundation
 
 enum MockRepository {
+    static let cancelSubscriptionClarificationOptions: [String] = [
+        "App Store",
+        "Google Play",
+        "Website/account",
+        "PayPal",
+        "Bank/card charge",
+        "I'm not sure"
+    ]
+
     static let templates: [TaskTemplate] = [
         TaskTemplate(
             title: "Follow-up email",
@@ -54,6 +63,20 @@ enum MockRepository {
         let cleanPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let fallbackPrompt = template?.promptHint ?? "Help me make this task clear and doable."
         let effectivePrompt = cleanPrompt.isEmpty ? fallbackPrompt : cleanPrompt
+
+        if isCancelSubscriptionIntent(prompt: effectivePrompt, template: template) {
+            return TaskDraft(
+                title: "Cancel subscription",
+                prompt: effectivePrompt,
+                intent: .cancelSubscription,
+                requiresClarification: true,
+                clarificationQuestion: "Where is this subscription billed?",
+                clarificationOptions: cancelSubscriptionClarificationOptions,
+                generatedReply: "I need one quick detail before giving exact steps.",
+                actionPlan: []
+            )
+        }
+
         let shortTitle = effectivePrompt
             .split(separator: ".")
             .first
@@ -62,7 +85,10 @@ enum MockRepository {
         return TaskDraft(
             title: String(shortTitle.prefix(36)),
             prompt: effectivePrompt,
-            clarificationQuestion: "What outcome should feel complete by end of day?",
+            intent: .generic,
+            requiresClarification: false,
+            clarificationQuestion: "",
+            clarificationOptions: [],
             generatedReply: "Thanks for the context. Here's a calm first draft based on your goal, with a clear ask and one next step.",
             actionPlan: [
                 "Clarify your desired outcome",
@@ -76,6 +102,68 @@ enum MockRepository {
         var updated = draft
         let cleanAnswer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.clarificationAnswer = cleanAnswer
+        updated.requiresClarification = false
+
+        if draft.intent == .cancelSubscription {
+            switch cleanAnswer {
+            case "App Store":
+                updated.title = "Cancel App Store subscription"
+                updated.generatedReply = "This is an App Store subscription. You cancel it through your Apple ID, not the service website."
+                updated.actionPlan = [
+                    "Open Settings on your iPhone",
+                    "Tap your Apple ID/name",
+                    "Tap Subscriptions",
+                    "Find the subscription",
+                    "Tap Cancel Subscription",
+                    "Save confirmation"
+                ]
+            case "Google Play":
+                updated.title = "Cancel Google Play subscription"
+                updated.generatedReply = "This looks billed via Google Play. Cancel it from your Google account subscriptions list."
+                updated.actionPlan = [
+                    "Open Google Play",
+                    "Tap profile",
+                    "Open Payments & subscriptions",
+                    "Tap Subscriptions",
+                    "Select the subscription",
+                    "Tap Cancel subscription"
+                ]
+            case "Website/account":
+                updated.title = "Cancel website subscription"
+                updated.generatedReply = "This looks billed through the service website. Cancel it from the account billing area."
+                updated.actionPlan = [
+                    "Sign in to the service account",
+                    "Open billing/subscription settings",
+                    "Select the active plan",
+                    "Choose cancel subscription",
+                    "Confirm cancellation",
+                    "Save confirmation email"
+                ]
+            case "PayPal":
+                updated.title = "Cancel PayPal payment agreement"
+                updated.generatedReply = "This looks billed via PayPal. Cancel the automatic payment in your PayPal account."
+                updated.actionPlan = [
+                    "Open PayPal",
+                    "Go to Settings",
+                    "Open Payments",
+                    "Find Automatic Payments",
+                    "Select the merchant",
+                    "Cancel agreement"
+                ]
+            case "Bank/card charge", "I'm not sure":
+                updated.title = "Confirm subscription billing source"
+                updated.generatedReply = "Before canceling, confirm where the charge comes from so we can give exact steps."
+                updated.actionPlan = [
+                    "Check your latest charge descriptor",
+                    "Match it to App Store, Google Play, or website",
+                    "Re-open this task and choose billing source"
+                ]
+            default:
+                updated.generatedReply = "Thanks, that helps. I'll tailor the next steps based on this billing source."
+            }
+
+            return updated
+        }
 
         if !cleanAnswer.isEmpty {
             updated.generatedReply = "Thanks, that helps. Based on your outcome (\(cleanAnswer)), here's a focused draft reply you can send now."
@@ -89,16 +177,52 @@ enum MockRepository {
         return updated
     }
 
-    static func makeTask(from draft: TaskDraft) -> MockTask {
-        MockTask(
+    static func makeTask(from draft: TaskDraft, status: TaskStatus = .ready) -> MockTask {
+        var generatedReply = draft.generatedReply
+        var actionPlan = draft.actionPlan
+
+        if status == .needsClarification {
+            generatedReply = "This task needs one clarification before OneDone can provide exact steps."
+            actionPlan = [
+                "Open task details",
+                "Answer clarification question",
+                "Continue to result"
+            ]
+        }
+
+        return MockTask(
             title: draft.title.isEmpty ? "New task" : draft.title,
             prompt: draft.prompt,
             clarification: draft.clarificationAnswer.isEmpty ? draft.clarificationQuestion : draft.clarificationAnswer,
-            generatedReply: draft.generatedReply,
-            actionPlan: draft.actionPlan,
+            generatedReply: generatedReply,
+            actionPlan: actionPlan,
             createdAt: Date(),
             dueDate: Calendar.current.date(byAdding: .day, value: 1, to: Date()),
-            status: .ready
+            status: status
         )
+    }
+
+    private static func isCancelSubscriptionIntent(prompt: String, template: TaskTemplate?) -> Bool {
+        let normalizedPrompt = normalize(prompt)
+        let normalizedTemplateTitle = normalize(template?.title ?? "")
+        let normalizedTemplateHint = normalize(template?.promptHint ?? "")
+
+        let promptHasKeyword = normalizedPrompt.contains("cancel_subscription") ||
+            (normalizedPrompt.contains("cancel") && normalizedPrompt.contains("subscription"))
+        let templateHasKeyword =
+            (normalizedTemplateTitle.contains("cancel") && normalizedTemplateTitle.contains("subscription")) ||
+            normalizedTemplateTitle.contains("cancel_subscription") ||
+            (normalizedTemplateHint.contains("cancel") && normalizedTemplateHint.contains("subscription"))
+
+        return promptHasKeyword || templateHasKeyword
+    }
+
+    private static func normalize(_ text: String) -> String {
+        text
+            .lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

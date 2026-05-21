@@ -6,6 +6,7 @@ struct TaskResultView: View {
     let task: MockTask
 
     @State private var didSave = false
+    @State private var showTaskDetail = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -48,6 +49,14 @@ struct TaskResultView: View {
                     didSave = true
                 }
 
+                ODSecondaryButton(title: "View Task Detail", icon: "doc.text") {
+                    if !didSave {
+                        appState.saveTask(task)
+                        didSave = true
+                    }
+                    showTaskDetail = true
+                }
+
                 ODSecondaryButton(title: "Open My Tasks tab", icon: "list.bullet") {
                     appState.selectedTab = .tasks
                     dismiss()
@@ -57,6 +66,9 @@ struct TaskResultView: View {
         }
         .navigationTitle("Result")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showTaskDetail) {
+            TaskDetailView(task: task)
+        }
         .oneDoneScreen()
     }
 }
