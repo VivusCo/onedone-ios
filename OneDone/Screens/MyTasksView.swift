@@ -31,7 +31,7 @@ struct MyTasksView: View {
                 } else {
                     ForEach(filteredAndSortedTasks) { task in
                         NavigationLink {
-                            TaskDetailView(task: task)
+                            TaskDetailView(appState: appState, taskID: task.id)
                         } label: {
                             taskCard(task)
                         }

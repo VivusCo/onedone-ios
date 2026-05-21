@@ -67,7 +67,7 @@ struct TaskResultView: View {
         .navigationTitle("Result")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $showTaskDetail) {
-            TaskDetailView(task: task)
+            TaskDetailView(appState: appState, taskID: task.id)
         }
         .oneDoneScreen()
     }
