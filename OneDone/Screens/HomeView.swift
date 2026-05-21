@@ -24,11 +24,20 @@ struct HomeView: View {
                 headerBar
 
                 ODStatusBadge(
-                    title: "Starter: \(appState.starterDaysRemaining) days left",
-                    tone: .highlight
+                    title: accessIndicatorTitle,
+                    tone: accessIndicatorTone
                 )
 
                 mainInputCard
+
+                if appState.showsAccessGateForCreation {
+                    ODInfoBanner(
+                        title: "Creation is locked",
+                        message: "You can still view existing tasks and details. New task creation is gated in this access state.",
+                        icon: "lock.fill",
+                        tone: .warning
+                    )
+                }
 
                 quickActionsSection
             }
@@ -197,6 +206,36 @@ struct HomeView: View {
             promptHint: generatedHint,
             focus: "Clear and actionable"
         )
+    }
+
+    private var accessIndicatorTitle: String {
+        switch appState.mockAccessState {
+        case .starter_active:
+            return "Starter: \(appState.starterDaysRemaining) days left"
+        case .trial_active:
+            return "Trial active"
+        case .subscription_active:
+            return "Subscription active"
+        case .starter_expired:
+            return "Starter expired"
+        case .billing_issue:
+            return "Billing issue"
+        case .trial_expired:
+            return "Trial expired"
+        case .subscription_expired:
+            return "Subscription expired"
+        }
+    }
+
+    private var accessIndicatorTone: ODStatusTone {
+        switch appState.mockAccessState {
+        case .starter_active:
+            return .highlight
+        case .trial_active, .subscription_active:
+            return .success
+        case .starter_expired, .billing_issue, .trial_expired, .subscription_expired:
+            return .warning
+        }
     }
 }
 

@@ -25,26 +25,34 @@ struct TemplatesView: View {
                     tone: appState.canCreateNewTasks ? .highlight : .warning
                 )
 
-                ForEach(appState.templates) { template in
-                    Button {
-                        handleTemplateTap(template)
-                    } label: {
-                        ODCard {
-                            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                                Text(template.title)
-                                    .font(OneDoneStyle.cardTitleFont)
-                                    .foregroundStyle(ODColor.textPrimary)
+                if appState.templates.isEmpty {
+                    ODCard {
+                        Text("No templates available in this mock state.")
+                            .font(OneDoneStyle.bodyFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                } else {
+                    ForEach(appState.templates) { template in
+                        Button {
+                            handleTemplateTap(template)
+                        } label: {
+                            ODCard {
+                                VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                                    Text(template.title)
+                                        .font(OneDoneStyle.cardTitleFont)
+                                        .foregroundStyle(ODColor.textPrimary)
 
-                                Text(template.promptHint)
-                                    .font(OneDoneStyle.subheadlineFont)
-                                    .foregroundStyle(ODColor.textSecondary)
-                                    .lineLimit(3)
+                                    Text(template.promptHint)
+                                        .font(OneDoneStyle.subheadlineFont)
+                                        .foregroundStyle(ODColor.textSecondary)
+                                        .lineLimit(3)
 
-                                ODStatusBadge(title: "Focus: \(template.focus)", tone: .neutral)
+                                    ODStatusBadge(title: "Focus: \(template.focus)", tone: .neutral)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
             .padding(OneDoneStyle.screenPadding)
