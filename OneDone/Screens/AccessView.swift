@@ -3,19 +3,20 @@ import Observation
 
 struct AccessView: View {
     @Bindable var appState: AppState
+    @State private var showGatePreview: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Access",
-                    subtitle: "Starter Access status and App Store trial gate (mock UI)"
+                    subtitle: "Mock starter, trial, and subscription states"
                 )
 
                 ODCard {
                     VStack(alignment: .leading, spacing: 12) {
                         ODStatusBadge(
-                            title: accessStatusTitle,
+                            title: appState.mockAccessState.displayName,
                             tone: accessStatusTone
                         )
 
@@ -23,52 +24,60 @@ struct AccessView: View {
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
 
-                        Text("Starter Access: \(appState.starterAccessDaysUsed)/\(appState.starterAccessDaysTotal) day(s) used")
+                        Text(appState.canCreateNewTasks ? "Creation is unlocked in this state." : "Creation is locked in this state. Existing tasks remain viewable.")
                             .font(OneDoneStyle.subheadlineFont)
                             .foregroundStyle(ODColor.textPrimary)
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Starter Access")
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        Text("Mock access state")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        ODPrimaryButton(
-                            title: appState.starterAccessStarted ? "Starter Access Started" : "Start Starter Access",
-                            icon: "play.fill",
-                            isDisabled: appState.starterAccessStarted
-                        ) {
-                            appState.startStarterAccess()
-                        }
-
-                        ODSecondaryButton(
-                            title: "Simulate Day Progress",
-                            icon: "calendar.badge.plus",
-                            isDisabled: !appState.starterAccessStarted || appState.starterDaysRemaining == 0
-                        ) {
-                            appState.simulateStarterDayProgress()
+                        ForEach(MockAccessState.allCases) { state in
+                            Button {
+                                appState.setMockAccessState(state)
+                            } label: {
+                                HStack {
+                                    Text(state.displayName)
+                                        .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                                        .foregroundStyle(ODColor.textPrimary)
+                                    Spacer()
+                                    if appState.mockAccessState == state {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(ODColor.primary)
+                                    }
+                                }
+                                .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+                                .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+                                .background(
+                                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                        .fill(appState.mockAccessState == state ? ODColor.primarySoft : ODColor.surfaceStrong)
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
 
                 ODCard {
                     VStack(alignment: .leading, spacing: 12) {
-                        Text("App Store Trial Gate")
+                        Text("Gate preview")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        Text("14-day trial unlocks after Starter Access is completed.")
+                        Text("Use this to test Starter and trial/subscription gate states without StoreKit.")
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
 
                         ODPrimaryButton(
-                            title: appState.appStoreTrialActivated ? "Trial Activated (Mock)" : "Activate App Store Trial",
-                            icon: "sparkles",
-                            isDisabled: !appState.isTrialEligible || appState.appStoreTrialActivated
+                            title: "Open Subscription Gate",
+                            icon: "lock.fill",
+                            isDisabled: appState.canCreateNewTasks
                         ) {
-                            appState.activateAppStoreTrial()
+                            showGatePreview = true
                         }
                     }
                 }
@@ -79,24 +88,26 @@ struct AccessView: View {
             }
             .padding(OneDoneStyle.screenPadding)
         }
+        .sheet(isPresented: $showGatePreview) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showGatePreview = false
+            }
+        }
         .oneDoneScreen()
     }
 
-    private var accessStatusTitle: String {
-        if appState.appStoreTrialActivated {
-            return "Trial active"
-        }
-        if appState.isTrialEligible {
-            return "Trial available"
-        }
-        return "Starter access"
-    }
-
     private var accessStatusTone: ODStatusTone {
-        if appState.appStoreTrialActivated {
+        switch appState.mockAccessState {
+        case .starter_active, .trial_active, .subscription_active:
             return .success
+        case .starter_expired, .trial_expired, .subscription_expired:
+            return .warning
+        case .billing_issue:
+            return .warning
         }
-        return appState.isTrialEligible ? .highlight : .neutral
     }
 }
 

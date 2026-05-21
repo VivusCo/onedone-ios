@@ -30,6 +30,37 @@ struct OnboardingPage: Identifiable, Hashable {
     let body: String
 }
 
+enum MockAccessState: String, CaseIterable, Identifiable {
+    case starter_active
+    case starter_expired
+    case trial_active
+    case subscription_active
+    case billing_issue
+    case trial_expired
+    case subscription_expired
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .starter_active:
+            return "Starter Active"
+        case .starter_expired:
+            return "Starter Expired"
+        case .trial_active:
+            return "Trial Active"
+        case .subscription_active:
+            return "Subscription Active"
+        case .billing_issue:
+            return "Billing Issue"
+        case .trial_expired:
+            return "Trial Expired"
+        case .subscription_expired:
+            return "Subscription Expired"
+        }
+    }
+}
+
 enum ReminderActionKind {
     case success
     case info
@@ -79,6 +110,7 @@ final class AppState {
     var starterAccessDaysUsed: Int = 0
     var starterAccessStarted: Bool = false
     var appStoreTrialActivated: Bool = false
+    var mockAccessState: MockAccessState = .starter_active
 
     var remindersEnabled: Bool = true
     var hapticsEnabled: Bool = true
@@ -104,27 +136,43 @@ final class AppState {
     }
 
     var hasExpiredStarterAccess: Bool {
-        starterAccessStarted && starterDaysRemaining == 0 && !appStoreTrialActivated
+        mockAccessState == .starter_expired
     }
 
     var hasActiveTemplateAccess: Bool {
-        !hasExpiredStarterAccess
+        canCreateNewTasks
+    }
+
+    var canCreateNewTasks: Bool {
+        switch mockAccessState {
+        case .starter_active, .trial_active, .subscription_active:
+            return true
+        case .starter_expired, .billing_issue, .trial_expired, .subscription_expired:
+            return false
+        }
+    }
+
+    var showsAccessGateForCreation: Bool {
+        !canCreateNewTasks
     }
 
     var accessSummary: String {
-        if !starterAccessStarted {
-            return "Starter Access has not started yet."
-        }
-
-        if starterDaysRemaining > 0 {
+        switch mockAccessState {
+        case .starter_active:
             return "\(starterDaysRemaining) day(s) of Starter Access remaining."
-        }
-
-        if appStoreTrialActivated {
+        case .starter_expired:
+            return "Starter Access has ended. Trial is required to keep creating new tasks."
+        case .trial_active:
             return "App Store trial is active (mock)."
+        case .subscription_active:
+            return "Subscription is active (mock)."
+        case .billing_issue:
+            return "There is a billing issue. Creation is temporarily locked in mock mode."
+        case .trial_expired:
+            return "Trial has expired. Start a subscription to continue creating tasks."
+        case .subscription_expired:
+            return "Subscription has expired. Renew to continue creating tasks."
         }
-
-        return "Starter Access completed. App Store trial can be activated."
     }
 
     func beginOnboarding() {
@@ -156,16 +204,62 @@ final class AppState {
 
     func startStarterAccess() {
         starterAccessStarted = true
+        if mockAccessState == .starter_expired {
+            setMockAccessState(.starter_active)
+        }
     }
 
     func simulateStarterDayProgress() {
         guard starterAccessStarted else { return }
         starterAccessDaysUsed = min(starterAccessDaysUsed + 1, starterAccessDaysTotal)
+        if starterDaysRemaining == 0 && mockAccessState == .starter_active {
+            setMockAccessState(.starter_expired)
+        }
     }
 
     func activateAppStoreTrial() {
         guard isTrialEligible else { return }
         appStoreTrialActivated = true
+        setMockAccessState(.trial_active)
+    }
+
+    func activateMockSubscription() {
+        setMockAccessState(.subscription_active)
+    }
+
+    func setMockAccessState(_ state: MockAccessState) {
+        mockAccessState = state
+
+        switch state {
+        case .starter_active:
+            starterAccessStarted = true
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = min(starterAccessDaysUsed, max(0, starterAccessDaysTotal - 1))
+        case .starter_expired:
+            starterAccessStarted = true
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = starterAccessDaysTotal
+        case .trial_active:
+            starterAccessStarted = true
+            appStoreTrialActivated = true
+            starterAccessDaysUsed = starterAccessDaysTotal
+        case .subscription_active:
+            starterAccessStarted = true
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = starterAccessDaysTotal
+        case .billing_issue:
+            starterAccessStarted = true
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = starterAccessDaysTotal
+        case .trial_expired:
+            starterAccessStarted = true
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = starterAccessDaysTotal
+        case .subscription_expired:
+            starterAccessStarted = true
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = starterAccessDaysTotal
+        }
     }
 
     func enterMainApp() {

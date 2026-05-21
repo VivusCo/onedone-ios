@@ -11,6 +11,7 @@ struct NewTaskView: View {
     @State private var showClarification: Bool = false
     @State private var taskResult: MockTask?
     @State private var showTaskResult: Bool = false
+    @State private var showSubscriptionGate: Bool = false
 
     var body: some View {
         ScrollView {
@@ -64,6 +65,11 @@ struct NewTaskView: View {
                     icon: "arrow.right",
                     isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ) {
+                    guard appState.canCreateNewTasks else {
+                        showSubscriptionGate = true
+                        return
+                    }
+
                     let createdDraft = appState.makeDraft(prompt: prompt, template: selectedTemplate)
 
                     if createdDraft.requiresClarification {
@@ -80,6 +86,14 @@ struct NewTaskView: View {
         .navigationTitle("New Task")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+        .sheet(isPresented: $showSubscriptionGate) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showSubscriptionGate = false
+            }
+        }
         .onAppear {
             if prompt.isEmpty {
                 prompt = prefilledPrompt ?? ""
