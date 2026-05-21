@@ -5,6 +5,12 @@ struct TaskDetailView: View {
     @Bindable var appState: AppState
     let taskID: UUID
 
+    @State private var reminderFeedback: ReminderActionFeedback?
+    @State private var isReminderActionInProgress: Bool = false
+    @State private var showCustomDatePicker: Bool = false
+    @State private var customReminderDate: Date =
+        Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86_400)
+
     private var task: MockTask? {
         appState.task(for: taskID)
     }
@@ -43,6 +49,9 @@ struct TaskDetailView: View {
         .navigationTitle("Task Detail")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+        .sheet(isPresented: $showCustomDatePicker) {
+            customDateSheet
+        }
     }
 
     private func headerSection(_ task: MockTask) -> some View {
@@ -176,6 +185,74 @@ struct TaskDetailView: View {
                         .font(OneDoneStyle.subheadlineFont)
                         .foregroundStyle(ODColor.textSecondary)
                 }
+
+                VStack(spacing: OneDoneStyle.contentSpacing) {
+                    ODSecondaryButton(
+                        title: "Tomorrow",
+                        icon: "sun.max",
+                        isDisabled: isReminderActionInProgress
+                    ) {
+                        scheduleReminder(task, afterDays: 1, context: "Reminder scheduled for tomorrow.")
+                    }
+
+                    ODSecondaryButton(
+                        title: "In 2 days",
+                        icon: "calendar.badge.plus",
+                        isDisabled: isReminderActionInProgress
+                    ) {
+                        scheduleReminder(task, afterDays: 2, context: "Reminder scheduled for 2 days from now.")
+                    }
+
+                    ODSecondaryButton(
+                        title: "In 3 days",
+                        icon: "calendar.badge.plus",
+                        isDisabled: isReminderActionInProgress
+                    ) {
+                        scheduleReminder(task, afterDays: 3, context: "Reminder scheduled for 3 days from now.")
+                    }
+
+                    ODSecondaryButton(
+                        title: "Choose date",
+                        icon: "calendar",
+                        isDisabled: isReminderActionInProgress
+                    ) {
+                        customReminderDate = max(task.reminderDate ?? Date().addingTimeInterval(86_400), Date())
+                        showCustomDatePicker = true
+                    }
+                }
+
+                if task.reminderDate != nil {
+                    VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ODSecondaryButton(
+                            title: "Snooze +1 hour",
+                            icon: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            runReminderAction {
+                                await appState.snoozeTaskReminder(task.id, byHours: 1)
+                            }
+                        }
+
+                        ODSecondaryButton(
+                            title: "Cancel reminder",
+                            icon: "bell.slash",
+                            isDisabled: isReminderActionInProgress
+                        ) {
+                            runReminderAction {
+                                await appState.cancelTaskReminder(task.id)
+                            }
+                        }
+                    }
+                }
+
+                if let reminderFeedback {
+                    ODInfoBanner(
+                        title: reminderFeedbackTitle(reminderFeedback),
+                        message: reminderFeedback.message,
+                        icon: reminderFeedbackIcon(reminderFeedback),
+                        tone: reminderFeedbackTone(reminderFeedback)
+                    )
+                }
             }
         }
     }
@@ -233,6 +310,104 @@ struct TaskDetailView: View {
         Text(title)
             .font(OneDoneStyle.captionFont.weight(.semibold))
             .foregroundStyle(ODColor.primary)
+    }
+
+    private var customDateSheet: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
+                ODSectionHeader(
+                    title: "Choose reminder date",
+                    subtitle: "Pick when OneDone should remind you"
+                )
+
+                DatePicker(
+                    "Reminder date",
+                    selection: $customReminderDate,
+                    in: Date()...,
+                    displayedComponents: [.date, .hourAndMinute]
+                )
+                .datePickerStyle(.graphical)
+                .tint(ODColor.primary)
+
+                ODPrimaryButton(
+                    title: "Schedule reminder",
+                    icon: "checkmark.circle.fill",
+                    isDisabled: isReminderActionInProgress
+                ) {
+                    guard let task else { return }
+                    runReminderAction {
+                        await appState.scheduleTaskReminder(
+                            task.id,
+                            on: customReminderDate,
+                            context: "Reminder scheduled for custom date."
+                        )
+                    }
+                    showCustomDatePicker = false
+                }
+
+                ODSecondaryButton(
+                    title: "Cancel",
+                    icon: "xmark",
+                    isDisabled: isReminderActionInProgress
+                ) {
+                    showCustomDatePicker = false
+                }
+            }
+            .padding(OneDoneStyle.screenPadding)
+            .oneDoneScreen()
+        }
+    }
+
+    private func scheduleReminder(_ task: MockTask, afterDays days: Int, context: String) {
+        let reminderDate = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date().addingTimeInterval(86_400)
+        runReminderAction {
+            await appState.scheduleTaskReminder(task.id, on: reminderDate, context: context)
+        }
+    }
+
+    private func runReminderAction(_ action: @escaping () async -> ReminderActionFeedback) {
+        isReminderActionInProgress = true
+
+        Task {
+            let feedback = await action()
+            await MainActor.run {
+                reminderFeedback = feedback
+                isReminderActionInProgress = false
+            }
+        }
+    }
+
+    private func reminderFeedbackTitle(_ feedback: ReminderActionFeedback) -> String {
+        switch feedback.kind {
+        case .success:
+            return "Reminder updated"
+        case .info:
+            return "Reminder"
+        case .warning:
+            return "Notifications unavailable"
+        }
+    }
+
+    private func reminderFeedbackTone(_ feedback: ReminderActionFeedback) -> ODStatusTone {
+        switch feedback.kind {
+        case .success:
+            return .success
+        case .info:
+            return .neutral
+        case .warning:
+            return .warning
+        }
+    }
+
+    private func reminderFeedbackIcon(_ feedback: ReminderActionFeedback) -> String {
+        switch feedback.kind {
+        case .success:
+            return "checkmark.circle.fill"
+        case .info:
+            return "info.circle.fill"
+        case .warning:
+            return "bell.slash"
+        }
     }
 
     private var dateFormatter: DateFormatter {

@@ -30,6 +30,17 @@ struct OnboardingPage: Identifiable, Hashable {
     let body: String
 }
 
+enum ReminderActionKind {
+    case success
+    case info
+    case warning
+}
+
+struct ReminderActionFeedback {
+    let kind: ReminderActionKind
+    let message: String
+}
+
 @Observable
 final class AppState {
     enum Phase {
@@ -202,6 +213,7 @@ final class AppState {
 
         updateTask(taskID) { task in
             task.reminderDate = reminderDate
+            task.reminderNotificationID = nil
             task.lastEventPreview = "Reminder set."
             task.timeline.append(
                 TaskTimelineEntry(
@@ -213,8 +225,110 @@ final class AppState {
         }
     }
 
+    @MainActor
+    func scheduleTaskReminder(_ taskID: UUID, on date: Date, context: String) async -> ReminderActionFeedback {
+        guard let existingTask = task(for: taskID) else {
+            return ReminderActionFeedback(kind: .warning, message: "Task not found.")
+        }
+
+        let safeDate = max(date, Date().addingTimeInterval(60))
+        let scheduleResult = await LocalNotificationScheduler.shared.scheduleReminder(
+            taskTitle: existingTask.title,
+            date: safeDate
+        )
+
+        switch scheduleResult {
+        case let .scheduled(identifier):
+            if let previousID = existingTask.reminderNotificationID {
+                LocalNotificationScheduler.shared.cancelReminder(identifier: previousID)
+            }
+
+            updateTask(taskID) { task in
+                task.reminderDate = safeDate
+                task.reminderNotificationID = identifier
+                task.lastEventPreview = "Reminder scheduled."
+                task.timeline.append(
+                    TaskTimelineEntry(
+                        title: "Reminder scheduled",
+                        detail: context,
+                        date: Date()
+                    )
+                )
+            }
+
+            return ReminderActionFeedback(
+                kind: .success,
+                message: "Reminder set for \(friendlyDateTime(safeDate))."
+            )
+        case .permissionDenied:
+            return ReminderActionFeedback(
+                kind: .warning,
+                message: "Notifications are off for OneDone. Enable them in Settings to get reminders."
+            )
+        case .failed:
+            return ReminderActionFeedback(
+                kind: .warning,
+                message: "Could not schedule reminder right now. Please try again."
+            )
+        }
+    }
+
+    @MainActor
+    func cancelTaskReminder(_ taskID: UUID) async -> ReminderActionFeedback {
+        guard let existingTask = task(for: taskID) else {
+            return ReminderActionFeedback(kind: .warning, message: "Task not found.")
+        }
+
+        guard existingTask.reminderDate != nil || existingTask.reminderNotificationID != nil else {
+            return ReminderActionFeedback(kind: .info, message: "No active reminder to cancel.")
+        }
+
+        if let reminderID = existingTask.reminderNotificationID {
+            LocalNotificationScheduler.shared.cancelReminder(identifier: reminderID)
+        }
+
+        updateTask(taskID) { task in
+            task.reminderDate = nil
+            task.reminderNotificationID = nil
+            task.lastEventPreview = "Reminder canceled."
+            task.timeline.append(
+                TaskTimelineEntry(
+                    title: "Reminder canceled",
+                    detail: "Local reminder removed.",
+                    date: Date()
+                )
+            )
+        }
+
+        return ReminderActionFeedback(kind: .success, message: "Reminder canceled.")
+    }
+
+    @MainActor
+    func snoozeTaskReminder(_ taskID: UUID, byHours hours: Int = 1) async -> ReminderActionFeedback {
+        guard let existingTask = task(for: taskID) else {
+            return ReminderActionFeedback(kind: .warning, message: "Task not found.")
+        }
+
+        let baseDate = max(existingTask.reminderDate ?? Date(), Date())
+        let snoozeDate = Calendar.current.date(byAdding: .hour, value: max(1, hours), to: baseDate) ??
+            Date().addingTimeInterval(3600)
+
+        return await scheduleTaskReminder(
+            taskID,
+            on: snoozeDate,
+            context: "Reminder snoozed by \(max(1, hours)) hour."
+        )
+    }
+
     private func updateTask(_ taskID: UUID, update: (inout MockTask) -> Void) {
         guard let index = tasks.firstIndex(where: { $0.id == taskID }) else { return }
         update(&tasks[index])
+    }
+
+    private func friendlyDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
