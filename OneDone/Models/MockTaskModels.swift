@@ -162,6 +162,7 @@ struct MockTask: Identifiable, Hashable {
     var createdAt: Date
     var dueDate: Date?
     var reminderDate: Date?
+    var reminderNotificationID: String?
     var status: TaskStatus
 
     init(
@@ -180,6 +181,7 @@ struct MockTask: Identifiable, Hashable {
         currentNextStep: String? = nil,
         lastEventPreview: String? = nil,
         reminderDate: Date? = nil,
+        reminderNotificationID: String? = nil,
         timeline: [TaskTimelineEntry] = []
     ) {
         self.id = id
@@ -197,6 +199,7 @@ struct MockTask: Identifiable, Hashable {
         self.createdAt = createdAt
         self.dueDate = dueDate
         self.reminderDate = reminderDate
+        self.reminderNotificationID = reminderNotificationID
         self.status = status
     }
 }
