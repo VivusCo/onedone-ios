@@ -9,11 +9,11 @@ struct StarterAccessIntroView: View {
 
             ODCard {
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("Start simple")
+                    Text("Your first 3 days are open.")
                         .font(OneDoneStyle.cardTitleFont)
                         .foregroundStyle(ODColor.primary)
 
-                    Text("After onboarding, you unlock 3-day Starter Access. Once it is complete, the App Store 14-day trial becomes available.")
+                    Text("Try OneDone with real tasks. After 3 days, start your 14-day App Store trial to keep going.")
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
 
@@ -25,7 +25,7 @@ struct StarterAccessIntroView: View {
                 }
             }
 
-            ODPrimaryButton(title: "Continue", icon: "arrow.right") {
+            ODPrimaryButton(title: "Start using OneDone", icon: "arrow.right") {
                 onContinue()
             }
 

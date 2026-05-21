@@ -23,7 +23,7 @@ struct AppFlow: View {
                 )
             case .starterIntro:
                 StarterAccessIntroView {
-                    appState.goToAccessGate()
+                    appState.enterMainApp()
                 }
             case .access:
                 AccessView(appState: appState)
