@@ -159,8 +159,16 @@ final class AppState {
         MockRepository.makeDraft(prompt: prompt, template: template)
     }
 
-    func finalizeTask(from draft: TaskDraft) -> MockTask {
-        MockRepository.makeTask(from: draft)
+    func applyClarification(answer: String, to draft: TaskDraft) -> TaskDraft {
+        MockRepository.applyClarification(answer: answer, to: draft)
+    }
+
+    func finalizeTask(from draft: TaskDraft, status: TaskStatus = .ready) -> MockTask {
+        MockRepository.makeTask(from: draft, status: status)
+    }
+
+    func makeNeedsClarificationTask(from draft: TaskDraft) -> MockTask {
+        MockRepository.makeTask(from: draft, status: .needsClarification)
     }
 
     func saveTask(_ task: MockTask) {

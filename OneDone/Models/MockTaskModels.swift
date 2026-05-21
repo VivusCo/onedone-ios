@@ -2,11 +2,17 @@ import Foundation
 
 enum TaskStatus: String, CaseIterable, Identifiable, Hashable {
     case draft = "Draft"
+    case needsClarification = "Needs Clarification"
     case inProgress = "In progress"
     case ready = "Ready"
     case done = "Done"
 
     var id: String { rawValue }
+}
+
+enum TaskIntent: String, Hashable {
+    case generic
+    case cancelSubscription
 }
 
 struct TaskTemplate: Identifiable, Hashable {
@@ -27,7 +33,10 @@ struct TaskDraft: Identifiable, Hashable {
     let id: UUID
     var title: String
     var prompt: String
+    var intent: TaskIntent
+    var requiresClarification: Bool
     var clarificationQuestion: String
+    var clarificationOptions: [String]
     var clarificationAnswer: String
     var generatedReply: String
     var actionPlan: [String]
@@ -36,7 +45,10 @@ struct TaskDraft: Identifiable, Hashable {
         id: UUID = UUID(),
         title: String,
         prompt: String,
+        intent: TaskIntent = .generic,
+        requiresClarification: Bool = false,
         clarificationQuestion: String,
+        clarificationOptions: [String] = [],
         clarificationAnswer: String = "",
         generatedReply: String,
         actionPlan: [String]
@@ -44,7 +56,10 @@ struct TaskDraft: Identifiable, Hashable {
         self.id = id
         self.title = title
         self.prompt = prompt
+        self.intent = intent
+        self.requiresClarification = requiresClarification
         self.clarificationQuestion = clarificationQuestion
+        self.clarificationOptions = clarificationOptions
         self.clarificationAnswer = clarificationAnswer
         self.generatedReply = generatedReply
         self.actionPlan = actionPlan

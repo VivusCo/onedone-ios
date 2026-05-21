@@ -9,6 +9,8 @@ struct NewTaskView: View {
     @State private var prompt: String = ""
     @State private var draft: TaskDraft?
     @State private var showClarification: Bool = false
+    @State private var taskResult: MockTask?
+    @State private var showTaskResult: Bool = false
 
     var body: some View {
         ScrollView {
@@ -58,12 +60,19 @@ struct NewTaskView: View {
                 }
 
                 ODPrimaryButton(
-                    title: "Continue to Clarification",
+                    title: "Analyze Task",
                     icon: "arrow.right",
                     isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ) {
-                    draft = appState.makeDraft(prompt: prompt, template: selectedTemplate)
-                    showClarification = true
+                    let createdDraft = appState.makeDraft(prompt: prompt, template: selectedTemplate)
+
+                    if createdDraft.requiresClarification {
+                        draft = createdDraft
+                        showClarification = true
+                    } else {
+                        taskResult = appState.finalizeTask(from: createdDraft)
+                        showTaskResult = true
+                    }
                 }
             }
             .padding(OneDoneStyle.screenPadding)
@@ -79,6 +88,11 @@ struct NewTaskView: View {
         .navigationDestination(isPresented: $showClarification) {
             if let draft {
                 ClarificationView(appState: appState, initialDraft: draft)
+            }
+        }
+        .navigationDestination(isPresented: $showTaskResult) {
+            if let taskResult {
+                TaskResultView(appState: appState, task: taskResult)
             }
         }
     }
