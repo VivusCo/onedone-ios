@@ -30,27 +30,49 @@ struct OnboardingPage: Identifiable, Hashable {
     let body: String
 }
 
-enum MockAccessState: String, CaseIterable, Identifiable {
-    case starter_active
-    case starter_expired
-    case trial_active
-    case subscription_active
-    case billing_issue
-    case trial_expired
-    case subscription_expired
-
+extension APIAccessState: Identifiable {
     var id: String { rawValue }
+
+    var creationAllowed: Bool {
+        switch self {
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            return true
+        case .unauthenticated, .onboarding_required, .starter_expired, .trial_not_started, .billing_issue, .trial_expired, .subscription_expired:
+            return false
+        }
+    }
+
+    var defaultStatusNote: String? {
+        switch self {
+        case .subscription_cancelled_active:
+            return "Subscription is active until period end. Auto-renew is turned off."
+        case .grace_period:
+            return "Billing grace period is active. Please resolve billing to avoid interruptions."
+        default:
+            return nil
+        }
+    }
 
     var displayName: String {
         switch self {
+        case .unauthenticated:
+            return "Unauthenticated"
+        case .onboarding_required:
+            return "Onboarding Required"
         case .starter_active:
             return "Starter Active"
         case .starter_expired:
             return "Starter Expired"
+        case .trial_not_started:
+            return "Trial Not Started"
         case .trial_active:
             return "Trial Active"
         case .subscription_active:
             return "Subscription Active"
+        case .subscription_cancelled_active:
+            return "Subscription Cancelled (Active)"
+        case .grace_period:
+            return "Grace Period"
         case .billing_issue:
             return "Billing Issue"
         case .trial_expired:
@@ -79,10 +101,12 @@ final class AppState {
         case onboarding
         case starterIntro
         case access
+        case accessStateLoading
+        case accessStateError
         case main
     }
 
-    var phase: Phase = .welcome
+    var phase: Phase
     var selectedTab: AppTab = .home
 
     var onboardingPageIndex: Int = 0
@@ -110,18 +134,24 @@ final class AppState {
     var starterAccessDaysUsed: Int = 0
     var starterAccessStarted: Bool = false
     var appStoreTrialActivated: Bool = false
-    var mockAccessState: MockAccessState = .starter_active
+    var mockAccessState: APIAccessState = .starter_active
+    var accessStatusNote: String?
+    var accessStateLoadErrorMessage: String?
+    var pendingHomeGateState: APIAccessState?
 
     var remindersEnabled: Bool = true
     var hapticsEnabled: Bool = true
     var calmModeEnabled: Bool = true
     let services: AppServiceContainer
+    private var didAttemptRemoteAccessBootstrap: Bool = false
+    private var isRefreshingRemoteAccessState: Bool = false
 
     var templates: [TaskTemplate] = MockRepository.templates
     var tasks: [MockTask] = MockRepository.seedTasks
 
     init(services: AppServiceContainer = .mock) {
         self.services = services
+        self.phase = services.runtimeMode == .remoteAccessState ? .accessStateLoading : .welcome
     }
 
     var currentOnboardingPage: OnboardingPage {
@@ -141,12 +171,7 @@ final class AppState {
     }
 
     var canCreateNewTasks: Bool {
-        switch mockAccessState {
-        case .starter_active, .trial_active, .subscription_active:
-            return true
-        case .starter_expired, .billing_issue, .trial_expired, .subscription_expired:
-            return false
-        }
+        mockAccessState.creationAllowed
     }
 
     var showsAccessGateForCreation: Bool {
@@ -155,16 +180,26 @@ final class AppState {
 
     var accessSummary: String {
         switch mockAccessState {
+        case .unauthenticated:
+            return "Authentication is required to continue."
+        case .onboarding_required:
+            return "Onboarding is required before Starter Access begins."
         case .starter_active:
             return "\(starterDaysRemaining) day(s) of Starter Access remaining."
         case .starter_expired:
             return "Starter Access has ended. Trial is required to keep creating new tasks."
+        case .trial_not_started:
+            return "Starter Access ended. Start the App Store trial to keep creating new tasks."
         case .trial_active:
-            return "App Store trial is active (mock)."
+            return "App Store trial is active."
         case .subscription_active:
-            return "Subscription is active (mock)."
+            return "Subscription is active."
+        case .subscription_cancelled_active:
+            return "Subscription remains active until period end."
+        case .grace_period:
+            return "Billing grace period is active. Resolve billing soon."
         case .billing_issue:
-            return "There is a billing issue. Creation is temporarily locked in mock mode."
+            return "There is a billing issue. Creation is temporarily locked."
         case .trial_expired:
             return "Trial has expired. Start a subscription to continue creating tasks."
         case .subscription_expired:
@@ -197,7 +232,7 @@ final class AppState {
 
     func startStarterAccess() {
         starterAccessStarted = true
-        if mockAccessState == .starter_expired {
+        if mockAccessState == .starter_expired || mockAccessState == .trial_not_started {
             setMockAccessState(.starter_active)
         }
     }
@@ -220,15 +255,20 @@ final class AppState {
         setMockAccessState(.subscription_active)
     }
 
-    func setMockAccessState(_ state: MockAccessState) {
+    func setMockAccessState(_ state: APIAccessState, statusNote: String? = nil) {
         mockAccessState = state
+        accessStatusNote = statusNote ?? state.defaultStatusNote
 
         switch state {
+        case .unauthenticated, .onboarding_required:
+            starterAccessStarted = false
+            appStoreTrialActivated = false
+            starterAccessDaysUsed = 0
         case .starter_active:
             starterAccessStarted = true
             appStoreTrialActivated = false
             starterAccessDaysUsed = min(starterAccessDaysUsed, max(0, starterAccessDaysTotal - 1))
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             starterAccessStarted = true
             appStoreTrialActivated = false
             starterAccessDaysUsed = starterAccessDaysTotal
@@ -236,7 +276,7 @@ final class AppState {
             starterAccessStarted = true
             appStoreTrialActivated = true
             starterAccessDaysUsed = starterAccessDaysTotal
-        case .subscription_active:
+        case .subscription_active, .subscription_cancelled_active, .grace_period:
             starterAccessStarted = true
             appStoreTrialActivated = false
             starterAccessDaysUsed = starterAccessDaysTotal
@@ -259,6 +299,46 @@ final class AppState {
         completeStarterIntro()
         startStarterAccess()
         phase = .main
+    }
+
+    @MainActor
+    func bootstrapAccessStateIfNeeded() async {
+        guard services.runtimeMode == .remoteAccessState else { return }
+        guard !didAttemptRemoteAccessBootstrap else { return }
+
+        didAttemptRemoteAccessBootstrap = true
+        await refreshAccessStateFromRemote()
+    }
+
+    @MainActor
+    func retryAccessStateLoad() async {
+        guard services.runtimeMode == .remoteAccessState else { return }
+        await refreshAccessStateFromRemote()
+    }
+
+    @MainActor
+    func continueWithMockSafeModeForDevelopment() {
+#if DEBUG
+        guard services.runtimeMode == .remoteAccessState else { return }
+        accessStateLoadErrorMessage = nil
+        pendingHomeGateState = nil
+        setMockAccessState(.starter_active)
+        phase = .welcome
+#endif
+    }
+
+    var canUseMockSafeFallback: Bool {
+#if DEBUG
+        services.runtimeMode == .remoteAccessState
+#else
+        false
+#endif
+    }
+
+    func consumePendingHomeGateState() -> APIAccessState? {
+        let gateState = pendingHomeGateState
+        pendingHomeGateState = nil
+        return gateState
     }
 
     func makeDraft(prompt: String, template: TaskTemplate?) -> TaskDraft {
@@ -413,6 +493,61 @@ final class AppState {
             on: snoozeDate,
             context: "Reminder snoozed by \(max(1, hours)) hour."
         )
+    }
+
+    @MainActor
+    private func refreshAccessStateFromRemote() async {
+        guard services.runtimeMode == .remoteAccessState else { return }
+        guard !isRefreshingRemoteAccessState else { return }
+
+        isRefreshingRemoteAccessState = true
+        phase = .accessStateLoading
+        accessStateLoadErrorMessage = nil
+        defer { isRefreshingRemoteAccessState = false }
+
+        do {
+            let snapshot = try await services.accessStateService.getAccessState()
+            applyAccessSnapshot(snapshot)
+        } catch {
+            accessStateLoadErrorMessage = friendlyAccessStateError(for: error)
+            phase = .accessStateError
+        }
+    }
+
+    @MainActor
+    private func applyAccessSnapshot(_ snapshot: AccessStateSnapshot) {
+        setMockAccessState(snapshot.state, statusNote: snapshot.statusNote)
+
+        if let starterDaysRemaining = snapshot.starterDaysRemaining {
+            let clampedRemaining = min(max(starterDaysRemaining, 0), starterAccessDaysTotal)
+            starterAccessDaysUsed = starterAccessDaysTotal - clampedRemaining
+        }
+
+        selectedTab = .home
+        pendingHomeGateState = nil
+
+        switch snapshot.state {
+        case .onboarding_required:
+            hasCompletedOnboarding = false
+            onboardingPageIndex = 0
+            phase = .onboarding
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            phase = .main
+        case .starter_expired, .trial_not_started, .billing_issue, .trial_expired, .subscription_expired:
+            pendingHomeGateState = snapshot.state
+            phase = .main
+        case .unauthenticated:
+            phase = .welcome
+            accessStatusNote = "Authentication flow is not connected in this mock build."
+        }
+    }
+
+    private func friendlyAccessStateError(for error: Error) -> String {
+        if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
+            return description
+        }
+
+        return "We could not load your access state right now. Please check your connection and try again."
     }
 
     private func updateTask(_ taskID: UUID, update: (inout MockTask) -> Void) {

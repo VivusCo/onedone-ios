@@ -33,8 +33,8 @@ struct SettingsView: View {
 
                 ODCard {
                     ODInfoBanner(
-                        title: "Local data only",
-                        message: "All content in this prototype is local mock data. No Supabase, StoreKit, backend, or OpenAI calls are used.",
+                        title: "Runtime mode",
+                        message: runtimeModeMessage,
                         icon: "internaldrive.fill",
                         tone: .success
                     )
@@ -45,6 +45,17 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+    }
+
+    private var runtimeModeMessage: String {
+        switch appState.services.runtimeMode {
+        case .mock:
+            return "Running in local mock mode. No Supabase, StoreKit, backend, or OpenAI calls are used."
+        case .remoteAccessState:
+            return "Using backend get-access-state for access routing. Task, reply, reminder, and subscription actions remain local mock behavior."
+        case .remotePlaceholder:
+            return "Remote placeholder mode is scaffold-only and not intended for runtime."
+        }
     }
 }
 

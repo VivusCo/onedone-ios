@@ -1,11 +1,11 @@
 import Foundation
 
 struct MockAccessStateService: AccessStateServiceProtocol {
-    func completeOnboarding(_ request: CompleteOnboardingRequest) throws -> AccessStateSnapshot {
+    func completeOnboarding(_ request: CompleteOnboardingRequest) async throws -> AccessStateSnapshot {
         AccessStateSnapshot(state: .starter_active, starterDaysRemaining: 3)
     }
 
-    func getAccessState() throws -> AccessStateSnapshot {
+    func getAccessState() async throws -> AccessStateSnapshot {
         AccessStateSnapshot(state: .starter_active, starterDaysRemaining: 3)
     }
 }
