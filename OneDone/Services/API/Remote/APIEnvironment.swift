@@ -4,19 +4,31 @@ struct APIEnvironment {
     static let baseURLKey = "ONEDONE_API_BASE_URL"
     static let useRemoteAccessStateKey = "ONEDONE_USE_REMOTE_ACCESS_STATE"
     static let useRemoteTaskAnalysisKey = "ONEDONE_USE_REMOTE_TASK_ANALYSIS"
+    static let useRemoteTaskActionsKey = "ONEDONE_USE_REMOTE_TASK_ACTIONS"
+    static let useRemoteReminderSyncKey = "ONEDONE_USE_REMOTE_REMINDER_SYNC"
     static let placeholderBaseURL = "https://your-backend.example.com"
 
     let baseURL: URL?
     let useRemoteAccessState: Bool
     let useRemoteTaskAnalysis: Bool
+    let useRemoteTaskActions: Bool
+    let useRemoteReminderSync: Bool
 
     static let current = APIEnvironment(
         baseURLString: environmentValue(for: baseURLKey) ?? bundleValue(for: baseURLKey),
         useRemoteAccessStateValue: environmentValue(for: useRemoteAccessStateKey) ?? bundleValue(for: useRemoteAccessStateKey),
-        useRemoteTaskAnalysisValue: environmentValue(for: useRemoteTaskAnalysisKey) ?? bundleValue(for: useRemoteTaskAnalysisKey)
+        useRemoteTaskAnalysisValue: environmentValue(for: useRemoteTaskAnalysisKey) ?? bundleValue(for: useRemoteTaskAnalysisKey),
+        useRemoteTaskActionsValue: environmentValue(for: useRemoteTaskActionsKey) ?? bundleValue(for: useRemoteTaskActionsKey),
+        useRemoteReminderSyncValue: environmentValue(for: useRemoteReminderSyncKey) ?? bundleValue(for: useRemoteReminderSyncKey)
     )
 
-    init(baseURLString: String?, useRemoteAccessStateValue: String?, useRemoteTaskAnalysisValue: String?) {
+    init(
+        baseURLString: String?,
+        useRemoteAccessStateValue: String?,
+        useRemoteTaskAnalysisValue: String?,
+        useRemoteTaskActionsValue: String?,
+        useRemoteReminderSyncValue: String?
+    ) {
         if let baseURLString, !baseURLString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             baseURL = URL(string: baseURLString)
         } else {
@@ -25,6 +37,8 @@ struct APIEnvironment {
 
         useRemoteAccessState = APIEnvironment.parseBool(useRemoteAccessStateValue) ?? false
         useRemoteTaskAnalysis = APIEnvironment.parseBool(useRemoteTaskAnalysisValue) ?? useRemoteAccessState
+        useRemoteTaskActions = APIEnvironment.parseBool(useRemoteTaskActionsValue) ?? useRemoteTaskAnalysis
+        useRemoteReminderSync = APIEnvironment.parseBool(useRemoteReminderSyncValue) ?? useRemoteTaskActions
     }
 
     private static func parseBool(_ value: String?) -> Bool? {

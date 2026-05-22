@@ -15,17 +15,17 @@ struct RemoteTaskService: TaskServiceProtocol {
         self.urlSession = urlSession
     }
 
-    // Local fallback used until answer-clarification endpoint is connected.
+    // Local fallback for mock-safe mode and previews.
     func analyzeTask(prompt: String, template: TaskTemplate?) -> TaskDraft {
         MockRepository.makeDraft(prompt: prompt, template: template)
     }
 
-    // Local fallback used until answer-clarification endpoint is connected.
+    // Local fallback for mock-safe mode and previews.
     func answerClarification(answer: String, draft: TaskDraft) -> TaskDraft {
         MockRepository.applyClarification(answer: answer, to: draft)
     }
 
-    // Local fallback used until full task actions are connected.
+    // Local fallback for mock-safe mode and previews.
     func createTask(from draft: TaskDraft, status: TaskStatus) -> MockTask {
         MockRepository.makeTask(from: draft, status: status)
     }
@@ -91,8 +91,203 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
     }
 
-    func messageMarkedSent(_ request: MessageMarkedSentRequest) throws -> MessageMarkedSentResponse {
-        throw ServiceScaffoldError.notImplemented(service: "RemoteTaskService", method: "messageMarkedSent")
+    func submitAnswerClarification(_ request: AnswerClarificationRequest, idempotencyKey: String) async throws -> AnalyzeTaskServiceResponse {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/answer-clarification",
+            body: request,
+            idempotencyKey: idempotencyKey
+        )
+
+        guard let payload = decodeAnalyzePayload(from: data) else {
+            throw TaskActionServiceError.invalidResponse
+        }
+
+        if case .accessError = payload.responseType {
+            throw TaskActionServiceError.accessDenied(
+                message: payloadMessage(payload) ?? "Your current access does not allow this action."
+            )
+        }
+
+        if case .paywallError = payload.responseType {
+            throw TaskActionServiceError.accessDenied(
+                message: payloadMessage(payload) ?? "Start trial or subscription to continue."
+            )
+        }
+
+        if case .retryableError = payload.responseType {
+            throw TaskActionServiceError.retryable(
+                message: payloadMessage(payload) ?? "Could not complete this clarification right now."
+            )
+        }
+
+        do {
+            return try mapPayload(payload)
+        } catch let error as AnalyzeTaskServiceError {
+            switch error {
+            case let .accessDenied(message):
+                throw TaskActionServiceError.accessDenied(message: message)
+            case let .retryable(message):
+                throw TaskActionServiceError.retryable(message: message)
+            case let .unsupportedResponse(message):
+                throw TaskActionServiceError.unsupportedResponse(message: message)
+            default:
+                throw TaskActionServiceError.unsupportedResponse(message: error.errorDescription ?? "Could not parse clarification response.")
+            }
+        } catch {
+            throw TaskActionServiceError.invalidResponse
+        }
+    }
+
+    func submitGenerateReply(_ request: GenerateReplyRequest, idempotencyKey: String) async throws -> GenerateReplyResponse {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/generate-reply",
+            body: request,
+            idempotencyKey: idempotencyKey
+        )
+
+        if let payload = decodeSingleWrapper(data, as: GenerateReplyResponse.self) {
+            return payload
+        }
+
+        throw TaskActionServiceError.invalidResponse
+    }
+
+    func submitUpdateTaskStatus(_ request: UpdateTaskStatusRequest, idempotencyKey: String) async throws -> UpdateTaskStatusResponse {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/update-task-status",
+            body: request,
+            idempotencyKey: idempotencyKey
+        )
+
+        if let payload = decodeSingleWrapper(data, as: UpdateTaskStatusResponse.self) {
+            return payload
+        }
+
+        throw TaskActionServiceError.invalidResponse
+    }
+
+    func submitMessageMarkedSent(_ request: MessageMarkedSentRequest, idempotencyKey: String) async throws -> MessageMarkedSentResponse {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/message-marked-sent",
+            body: request,
+            idempotencyKey: idempotencyKey
+        )
+
+        if let payload = decodeSingleWrapper(data, as: MessageMarkedSentResponse.self) {
+            return payload
+        }
+
+        throw TaskActionServiceError.invalidResponse
+    }
+
+    func fetchTaskList() async throws -> [BackendTaskSummaryDTO] {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        struct EmptyBody: Codable {}
+        let data = try await postEdgeFunction(path: "functions/v1/list-tasks", body: EmptyBody(), idempotencyKey: nil)
+        return decodeArrayWrapper(data, as: BackendTaskSummaryDTO.self) ?? []
+    }
+
+    func fetchTaskDetail(taskID: String) async throws -> BackendTaskDetailDTO? {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        struct RequestBody: Codable {
+            let taskID: String
+            enum CodingKeys: String, CodingKey {
+                case taskID = "task_id"
+            }
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/get-task-detail",
+            body: RequestBody(taskID: taskID),
+            idempotencyKey: nil
+        )
+
+        return decodeSingleWrapper(data, as: BackendTaskDetailDTO.self)
+    }
+
+    func fetchTaskOutputs(taskID: String) async throws -> [BackendTaskOutputDTO] {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        struct RequestBody: Codable {
+            let taskID: String
+            enum CodingKeys: String, CodingKey {
+                case taskID = "task_id"
+            }
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/get-task-outputs",
+            body: RequestBody(taskID: taskID),
+            idempotencyKey: nil
+        )
+
+        return decodeArrayWrapper(data, as: BackendTaskOutputDTO.self) ?? []
+    }
+
+    func fetchTaskEvents(taskID: String) async throws -> [BackendTaskEventDTO] {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        struct RequestBody: Codable {
+            let taskID: String
+            enum CodingKeys: String, CodingKey {
+                case taskID = "task_id"
+            }
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/get-task-events",
+            body: RequestBody(taskID: taskID),
+            idempotencyKey: nil
+        )
+
+        return decodeArrayWrapper(data, as: BackendTaskEventDTO.self) ?? []
+    }
+
+    func fetchChecklistItems(taskID: String) async throws -> [BackendChecklistItemDTO] {
+        guard environment.useRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        struct RequestBody: Codable {
+            let taskID: String
+            enum CodingKeys: String, CodingKey {
+                case taskID = "task_id"
+            }
+        }
+
+        let data = try await postEdgeFunction(
+            path: "functions/v1/get-checklist-items",
+            body: RequestBody(taskID: taskID),
+            idempotencyKey: nil
+        )
+
+        return decodeArrayWrapper(data, as: BackendChecklistItemDTO.self) ?? []
     }
 
     func processIncomingReply(_ request: ProcessIncomingReplyRequest) throws -> ProcessIncomingReplyResponse {
@@ -171,16 +366,7 @@ struct RemoteTaskService: TaskServiceProtocol {
     }
 
     private func decodeAnalyzePayload(from data: Data) -> AnalyzeTaskResponseDTO? {
-        let decoder = JSONDecoder()
-        if let direct = try? decoder.decode(AnalyzeTaskResponseDTO.self, from: data) {
-            return direct
-        }
-
-        if let wrapped = try? decoder.decode(AnalyzeTaskResponseWrapper.self, from: data) {
-            return wrapped.data ?? wrapped.result ?? wrapped.response
-        }
-
-        return nil
+        decodeSingleWrapper(data, as: AnalyzeTaskResponseDTO.self)
     }
 
     private func payloadMessage(_ payload: AnalyzeTaskResponseDTO?) -> String? {
@@ -205,10 +391,107 @@ struct RemoteTaskService: TaskServiceProtocol {
             return "Network issue while analyzing the task. Please try again."
         }
     }
+
+    private func postEdgeFunction<T: Codable>(
+        path: String,
+        body: T,
+        idempotencyKey: String?
+    ) async throws -> Data {
+        guard let baseURL = environment.baseURL else {
+            throw TaskActionServiceError.missingBaseURL
+        }
+
+        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        if let idempotencyKey, !idempotencyKey.isEmpty {
+            request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key")
+        }
+
+        if let token = tokenProvider.accessToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        request.httpBody = try JSONEncoder().encode(body)
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw TaskActionServiceError.invalidResponse
+            }
+
+            if isAccessStatus(httpResponse.statusCode) {
+                let message = decodeErrorMessage(data) ?? "Your current access does not allow this action."
+                throw TaskActionServiceError.accessDenied(message: message)
+            }
+
+            if isRetryableStatus(httpResponse.statusCode) {
+                let message = decodeErrorMessage(data) ?? "Action is temporarily unavailable. Please try again."
+                throw TaskActionServiceError.retryable(message: message)
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                let message = decodeErrorMessage(data) ?? "Action failed."
+                throw TaskActionServiceError.retryable(message: message)
+            }
+
+            return data
+        } catch let error as TaskActionServiceError {
+            throw error
+        } catch let error as URLError {
+            throw TaskActionServiceError.retryable(message: friendlyNetworkMessage(error))
+        } catch {
+            throw TaskActionServiceError.retryable(message: "Action failed. Please try again.")
+        }
+    }
+
+    private func decodeErrorMessage(_ data: Data) -> String? {
+        struct ErrorPayload: Decodable {
+            let message: String?
+            let error: String?
+        }
+
+        if let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data) {
+            return payload.message ?? payload.error
+        }
+        return nil
+    }
+
+    private func decodeSingleWrapper<T: Decodable>(_ data: Data, as type: T.Type) -> T? {
+        if let direct = try? JSONDecoder().decode(T.self, from: data) {
+            return direct
+        }
+
+        if let wrapped = try? JSONDecoder().decode(AnalyzeTaskResponseWrapper<T>.self, from: data) {
+            return wrapped.data ?? wrapped.result ?? wrapped.response
+        }
+
+        return nil
+    }
+
+    private func decodeArrayWrapper<T: Decodable>(_ data: Data, as type: T.Type) -> [T]? {
+        if let direct = try? JSONDecoder().decode([T].self, from: data) {
+            return direct
+        }
+
+        if let wrapped = try? JSONDecoder().decode(AnalyzeTaskArrayResponseWrapper<T>.self, from: data) {
+            return wrapped.data ?? wrapped.result ?? wrapped.response
+        }
+
+        return nil
+    }
 }
 
-private struct AnalyzeTaskResponseWrapper: Decodable {
-    let data: AnalyzeTaskResponseDTO?
-    let result: AnalyzeTaskResponseDTO?
-    let response: AnalyzeTaskResponseDTO?
+private struct AnalyzeTaskResponseWrapper<T: Decodable>: Decodable {
+    let data: T?
+    let result: T?
+    let response: T?
+}
+
+private struct AnalyzeTaskArrayResponseWrapper<T: Decodable>: Decodable {
+    let data: [T]?
+    let result: [T]?
+    let response: [T]?
 }

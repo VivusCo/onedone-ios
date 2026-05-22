@@ -14,6 +14,9 @@ struct DraftReplyView: View {
     @State private var showPostCopyPrompt: Bool = false
     @State private var showFollowUpReminderFlow: Bool = false
     @State private var reminderConfirmation: String?
+    @State private var actionFeedback: String?
+    @State private var isSyncActionInProgress: Bool = false
+    @State private var isRegeneratingReply: Bool = false
 
     private var task: MockTask? {
         appState.task(for: taskID)
@@ -48,6 +51,15 @@ struct DraftReplyView: View {
                             message: reminderConfirmation,
                             icon: "checkmark.circle.fill",
                             tone: .success
+                        )
+                    }
+
+                    if let actionFeedback {
+                        ODInfoBanner(
+                            title: "Sync update",
+                            message: actionFeedback,
+                            icon: "info.circle.fill",
+                            tone: .warning
                         )
                     }
                 } else {
@@ -172,13 +184,29 @@ struct DraftReplyView: View {
             ODPrimaryButton(
                 title: didCopy ? "Copied" : "Copy",
                 icon: didCopy ? "checkmark" : "doc.on.doc",
-                isDisabled: messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                isDisabled: messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSyncActionInProgress || isRegeneratingReply
             ) {
                 copyDraft()
             }
 
-            ODSecondaryButton(title: "Regenerate mock", icon: "arrow.clockwise") {
-                regenerateMockDraft()
+            ODSecondaryButton(
+                title: isRegeneratingReply ? "Regenerating..." : "Regenerate",
+                icon: "arrow.clockwise",
+                isDisabled: isRegeneratingReply || isSyncActionInProgress
+            ) {
+                Task {
+                    await regenerateDraft()
+                }
+            }
+
+            if isRegeneratingReply {
+                HStack(spacing: OneDoneStyle.tightSpacing) {
+                    ProgressView()
+                        .tint(ODColor.primary)
+                    Text("Generating reply...")
+                        .font(OneDoneStyle.subheadlineFont)
+                        .foregroundStyle(ODColor.textSecondary)
+                }
             }
         }
     }
@@ -190,25 +218,24 @@ struct DraftReplyView: View {
                     .font(OneDoneStyle.cardTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
 
-                ODPrimaryButton(title: "Yes, I sent it", icon: "checkmark.circle.fill") {
-                    appState.markTaskWaitingForReply(taskID, sentMessage: messageBody)
-                    showPostCopyPrompt = false
-                    showFollowUpReminderFlow = true
-                    reminderConfirmation = nil
+                ODPrimaryButton(
+                    title: "Yes, I sent it",
+                    icon: "checkmark.circle.fill",
+                    isDisabled: isSyncActionInProgress
+                ) {
+                    Task {
+                        await markAsSent()
+                    }
                 }
 
-                ODSecondaryButton(title: "Not yet", icon: "clock") {
+                ODSecondaryButton(title: "Not yet", icon: "clock", isDisabled: isSyncActionInProgress) {
                     showPostCopyPrompt = false
                 }
 
-                ODSecondaryButton(title: "Remind me later", icon: "bell") {
-                    appState.setTaskReminder(
-                        taskID,
-                        afterHours: 3,
-                        context: "Reminder from Draft Reply: send this message."
-                    )
-                    reminderConfirmation = "We will remind you in about 3 hours to send this message."
-                    showPostCopyPrompt = false
+                ODSecondaryButton(title: "Remind me later", icon: "bell", isDisabled: isSyncActionInProgress) {
+                    Task {
+                        await remindMeLater()
+                    }
                 }
             }
         }
@@ -236,12 +263,9 @@ struct DraftReplyView: View {
 
     private func reminderButton(title: String, hours: Int) -> some View {
         Button {
-            appState.setTaskReminder(
-                taskID,
-                afterHours: hours,
-                context: "Follow-up reminder after sent reply."
-            )
-            reminderConfirmation = "Follow-up reminder set for \(title.lowercased())."
+            Task {
+                await setFollowUpReminder(hours: hours, title: title)
+            }
         } label: {
             Text(title)
                 .font(OneDoneStyle.captionFont.weight(.semibold))
@@ -262,6 +286,7 @@ struct DraftReplyView: View {
         didCopy = true
         showPostCopyPrompt = true
         showFollowUpReminderFlow = false
+        actionFeedback = nil
     }
 
     private func regenerateMockDraft() {
@@ -271,6 +296,72 @@ struct DraftReplyView: View {
             language: selectedLanguage
         )
         didCopy = false
+    }
+
+    @MainActor
+    private func regenerateDraft() async {
+        guard !isRegeneratingReply else { return }
+        isRegeneratingReply = true
+        actionFeedback = nil
+        defer { isRegeneratingReply = false }
+
+        if appState.shouldUseRemoteTaskActions,
+           let task,
+           task.backendTaskID != nil {
+            do {
+                let response = try await appState.requestReplyRegeneration(
+                    taskID: taskID,
+                    tone: selectedTone.rawValue.lowercased(),
+                    language: selectedLanguage.rawValue.lowercased()
+                )
+                if let subjectResponse = response.subject, !subjectResponse.isEmpty {
+                    subject = subjectResponse
+                }
+                messageBody = response.message
+                didCopy = false
+            } catch {
+                actionFeedback = (error as? LocalizedError)?.errorDescription ?? "Could not regenerate reply right now."
+            }
+            return
+        }
+
+        regenerateMockDraft()
+    }
+
+    @MainActor
+    private func markAsSent() async {
+        guard !isSyncActionInProgress else { return }
+        isSyncActionInProgress = true
+        defer { isSyncActionInProgress = false }
+
+        let syncWarning = await appState.markTaskSentAndSync(taskID, sentMessage: messageBody)
+        actionFeedback = syncWarning
+        showPostCopyPrompt = false
+        showFollowUpReminderFlow = true
+        reminderConfirmation = nil
+    }
+
+    @MainActor
+    private func remindMeLater() async {
+        let reminderDate = Calendar.current.date(byAdding: .hour, value: 3, to: Date()) ?? Date().addingTimeInterval(3 * 3600)
+        let feedback = await appState.scheduleTaskReminder(
+            taskID,
+            on: reminderDate,
+            context: "Reminder from Draft Reply: send this message."
+        )
+        reminderConfirmation = feedback.message
+        showPostCopyPrompt = false
+    }
+
+    @MainActor
+    private func setFollowUpReminder(hours: Int, title: String) async {
+        let reminderDate = Calendar.current.date(byAdding: .hour, value: hours, to: Date()) ?? Date().addingTimeInterval(Double(hours) * 3600)
+        let feedback = await appState.scheduleTaskReminder(
+            taskID,
+            on: reminderDate,
+            context: "Follow-up reminder after sent reply."
+        )
+        reminderConfirmation = feedback.kind == .success ? "Follow-up reminder set for \(title.lowercased())." : feedback.message
     }
 
     private func regenerateMessage(base: String, tone: ReplyTone, language: ReplyLanguage) -> String {

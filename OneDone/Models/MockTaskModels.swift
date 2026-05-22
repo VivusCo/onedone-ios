@@ -43,6 +43,64 @@ enum TaskStatus: String, CaseIterable, Identifiable, Hashable {
             return 8
         }
     }
+
+    var backendValue: String {
+        switch self {
+        case .new:
+            return "new"
+        case .followUpNeeded:
+            return "follow_up_needed"
+        case .dueSoon:
+            return "due_soon"
+        case .needsClarification:
+            return "needs_clarification"
+        case .waitingForReply:
+            return "waiting_for_reply"
+        case .inProgress:
+            return "in_progress"
+        case .postponed:
+            return "postponed"
+        case .ready:
+            return "ready"
+        case .done:
+            return "done"
+        case .draft:
+            return "draft"
+        }
+    }
+
+    static func fromBackend(_ value: String?) -> TaskStatus {
+        guard let normalized = value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() else {
+            return .new
+        }
+
+        switch normalized {
+        case "new":
+            return .new
+        case "follow_up_needed":
+            return .followUpNeeded
+        case "due_soon":
+            return .dueSoon
+        case "needs_clarification":
+            return .needsClarification
+        case "waiting_for_reply":
+            return .waitingForReply
+        case "in_progress":
+            return .inProgress
+        case "postponed":
+            return .postponed
+        case "ready":
+            return .ready
+        case "done":
+            return .done
+        case "draft":
+            return .draft
+        default:
+            return .new
+        }
+    }
 }
 
 enum MyTasksFilter: String, CaseIterable, Identifiable {
@@ -185,6 +243,7 @@ struct TaskDraft: Identifiable, Hashable {
 struct MockTask: Identifiable, Hashable {
     let id: UUID
     var backendTaskID: String?
+    var backendReminderID: String?
     var title: String
     var category: String
     var prompt: String
@@ -205,6 +264,7 @@ struct MockTask: Identifiable, Hashable {
     init(
         id: UUID = UUID(),
         backendTaskID: String? = nil,
+        backendReminderID: String? = nil,
         title: String,
         category: String = "General",
         prompt: String,
@@ -224,6 +284,7 @@ struct MockTask: Identifiable, Hashable {
     ) {
         self.id = id
         self.backendTaskID = backendTaskID
+        self.backendReminderID = backendReminderID
         self.title = title
         self.category = category
         self.prompt = prompt

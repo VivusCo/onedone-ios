@@ -46,7 +46,10 @@ struct AppServiceContainer {
                 environment: environment,
                 tokenProvider: tokenProvider
             ),
-            reminderService: MockReminderService(),
+            reminderService: RemoteReminderService(
+                environment: environment,
+                tokenProvider: tokenProvider
+            ),
             subscriptionService: MockSubscriptionService()
         )
     }

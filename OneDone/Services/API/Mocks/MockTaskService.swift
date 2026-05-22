@@ -43,8 +43,65 @@ struct MockTaskService: TaskServiceProtocol {
         )
     }
 
-    func messageMarkedSent(_ request: MessageMarkedSentRequest) throws -> MessageMarkedSentResponse {
-        MessageMarkedSentResponse(taskID: request.taskID, status: "waiting_for_reply")
+    func submitAnswerClarification(_ request: AnswerClarificationRequest, idempotencyKey: String) async throws -> AnalyzeTaskServiceResponse {
+        .taskAnalysis(
+            taskID: request.taskID,
+            payload: AnalyzeTaskAnalysisPayload(
+                title: "Updated task",
+                summary: "Clarification received in mock mode.",
+                latestOutput: "Clarification received in mock mode.",
+                checklist: [
+                    "Review clarification details",
+                    "Continue with next action"
+                ],
+                nextSteps: [
+                    "Continue with next action"
+                ],
+                category: "General"
+            )
+        )
+    }
+
+    func submitGenerateReply(_ request: GenerateReplyRequest, idempotencyKey: String) async throws -> GenerateReplyResponse {
+        let toneLabel = request.tone ?? "Polite"
+        let languageLabel = request.language ?? "Auto"
+        return GenerateReplyResponse(
+            taskID: request.taskID,
+            subject: "Regarding your request",
+            message: "[\(toneLabel)] [\(languageLabel)] Thanks for your message. Here is a clear next step we can take."
+        )
+    }
+
+    func submitUpdateTaskStatus(_ request: UpdateTaskStatusRequest, idempotencyKey: String) async throws -> UpdateTaskStatusResponse {
+        UpdateTaskStatusResponse(
+            taskID: request.taskID,
+            status: request.status,
+            message: "Mock status update synced."
+        )
+    }
+
+    func submitMessageMarkedSent(_ request: MessageMarkedSentRequest, idempotencyKey: String) async throws -> MessageMarkedSentResponse {
+        MessageMarkedSentResponse(taskID: request.taskID, status: "waiting_for_reply", message: "Mock message-marked-sent synced.")
+    }
+
+    func fetchTaskList() async throws -> [BackendTaskSummaryDTO] {
+        []
+    }
+
+    func fetchTaskDetail(taskID: String) async throws -> BackendTaskDetailDTO? {
+        nil
+    }
+
+    func fetchTaskOutputs(taskID: String) async throws -> [BackendTaskOutputDTO] {
+        []
+    }
+
+    func fetchTaskEvents(taskID: String) async throws -> [BackendTaskEventDTO] {
+        []
+    }
+
+    func fetchChecklistItems(taskID: String) async throws -> [BackendChecklistItemDTO] {
+        []
     }
 
     func processIncomingReply(_ request: ProcessIncomingReplyRequest) throws -> ProcessIncomingReplyResponse {

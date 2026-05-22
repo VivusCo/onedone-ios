@@ -5,12 +5,22 @@ struct ClarificationView: View {
     @Bindable var appState: AppState
     let initialDraft: TaskDraft
 
+    @State private var activeDraft: TaskDraft
     @State private var selectedOption: String?
     @State private var manualAnswer: String = ""
     @State private var taskResult: MockTask?
     @State private var showTaskResult: Bool = false
+    @State private var isSubmitting: Bool = false
+    @State private var submitErrorMessage: String?
+    @State private var splitPreviewMessage: String?
 
     @Environment(\.dismiss) private var dismiss
+
+    init(appState: AppState, initialDraft: TaskDraft) {
+        self.appState = appState
+        self.initialDraft = initialDraft
+        _activeDraft = State(initialValue: initialDraft)
+    }
 
     var body: some View {
         ScrollView {
@@ -22,13 +32,13 @@ struct ClarificationView: View {
 
                 ODCard {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text(initialDraft.clarificationQuestion)
+                        Text(activeDraft.clarificationQuestion)
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         if hasOptions {
                             VStack(spacing: OneDoneStyle.tightSpacing) {
-                                ForEach(initialDraft.clarificationOptions, id: \.self) { option in
+                                ForEach(activeDraft.clarificationOptions, id: \.self) { option in
                                     clarificationOptionRow(option)
                                 }
                             }
@@ -45,18 +55,46 @@ struct ClarificationView: View {
                 ODPrimaryButton(
                     title: "Continue",
                     icon: "arrow.right",
-                    isDisabled: selectedClarificationAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    isDisabled: selectedClarificationAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
                 ) {
-                    let clarifiedDraft = appState.applyClarification(answer: selectedClarificationAnswer, to: initialDraft)
-                    taskResult = appState.finalizeTask(from: clarifiedDraft)
-                    showTaskResult = true
+                    Task {
+                        await submitClarification()
+                    }
                 }
 
                 ODSecondaryButton(title: "Skip for now", icon: "pause") {
-                    let pendingTask = appState.makeNeedsClarificationTask(from: initialDraft)
+                    let pendingTask = appState.makeNeedsClarificationTask(from: activeDraft)
                     appState.saveTask(pendingTask)
                     appState.selectedTab = .tasks
                     dismiss()
+                }
+
+                if isSubmitting {
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ProgressView()
+                            .tint(ODColor.primary)
+                        Text("Applying clarification...")
+                            .font(OneDoneStyle.subheadlineFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                }
+
+                if let submitErrorMessage {
+                    ODInfoBanner(
+                        title: "Could not continue",
+                        message: submitErrorMessage,
+                        icon: "exclamationmark.triangle.fill",
+                        tone: .warning
+                    )
+                }
+
+                if let splitPreviewMessage {
+                    ODInfoBanner(
+                        title: "Multiple tasks detected",
+                        message: splitPreviewMessage,
+                        icon: "list.bullet.rectangle",
+                        tone: .neutral
+                    )
                 }
             }
             .padding(OneDoneStyle.screenPadding)
@@ -72,7 +110,7 @@ struct ClarificationView: View {
     }
 
     private var hasOptions: Bool {
-        !initialDraft.clarificationOptions.isEmpty
+        !activeDraft.clarificationOptions.isEmpty
     }
 
     private var selectedClarificationAnswer: String {
@@ -81,6 +119,44 @@ struct ClarificationView: View {
         }
 
         return manualAnswer
+    }
+
+    @MainActor
+    private func submitClarification() async {
+        guard !isSubmitting else { return }
+        let answer = selectedClarificationAnswer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !answer.isEmpty else { return }
+
+        isSubmitting = true
+        submitErrorMessage = nil
+        splitPreviewMessage = nil
+        defer { isSubmitting = false }
+
+        do {
+            let result = try await appState.resolveClarification(
+                answer: answer,
+                for: activeDraft,
+                idempotencyKey: UUID().uuidString.lowercased()
+            )
+
+            switch result {
+            case let .taskAnalysis(task):
+                taskResult = task
+                showTaskResult = true
+            case let .clarification(nextDraft):
+                activeDraft = nextDraft
+                selectedOption = nil
+                manualAnswer = ""
+            case let .splitPreview(message):
+                splitPreviewMessage = message
+            }
+        } catch {
+            if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
+                submitErrorMessage = description
+            } else {
+                submitErrorMessage = "Could not apply clarification right now. Please try again."
+            }
+        }
     }
 
     @ViewBuilder
