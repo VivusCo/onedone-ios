@@ -353,6 +353,10 @@ final class AppState {
         services.runtimeMode == .remoteAccessState && !forceMockTaskFlowInSession
     }
 
+    var shouldUseRemoteTaskActions: Bool {
+        services.runtimeMode == .remoteAccessState && !forceMockTaskFlowInSession
+    }
+
     func makeDraft(prompt: String, template: TaskTemplate?) -> TaskDraft {
         services.taskService.analyzeTask(prompt: prompt, template: template)
     }
@@ -457,6 +461,201 @@ final class AppState {
         services.taskService.answerClarification(answer: answer, draft: draft)
     }
 
+    @MainActor
+    func resolveClarification(
+        answer: String,
+        for draft: TaskDraft,
+        idempotencyKey: String
+    ) async throws -> NewTaskAnalysisResult {
+        if !shouldUseRemoteTaskActions || draft.backendTaskID == nil {
+            let clarifiedDraft = applyClarification(answer: answer, to: draft)
+            let task = finalizeTask(from: clarifiedDraft)
+            return .taskAnalysis(task)
+        }
+
+        guard let backendTaskID = draft.backendTaskID else {
+            throw TaskActionServiceError.missingBackendTaskID
+        }
+
+        let request = AnswerClarificationRequest(taskID: backendTaskID, answer: answer)
+        let remoteResponse = try await services.taskService.submitAnswerClarification(
+            request,
+            idempotencyKey: idempotencyKey
+        )
+
+        switch remoteResponse {
+        case let .clarification(taskID, payload):
+            var updatedDraft = draft
+            updatedDraft.backendTaskID = taskID
+            updatedDraft.requiresClarification = true
+            updatedDraft.clarificationQuestion = firstNonEmpty(payload.question, "I need one more detail before I continue.")
+            updatedDraft.clarificationOptions = payload.options
+            updatedDraft.generatedReply = "I need one quick detail before giving exact steps."
+            updatedDraft.actionPlan = []
+            return .clarification(updatedDraft)
+        case let .taskAnalysis(taskID, payload):
+            let summary = firstNonEmpty(
+                payload.summary,
+                payload.latestOutput,
+                "Task analysis completed. Review the next step and continue."
+            )
+            let checklist = payload.checklist.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let nextSteps = payload.nextSteps.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let finalSteps = !nextSteps.isEmpty ? nextSteps : (!checklist.isEmpty ? checklist : ["Review the recommendation and take the first action."])
+
+            let resultDraft = TaskDraft(
+                backendTaskID: taskID,
+                title: firstNonEmpty(payload.title, draft.title, inferredTaskTitle(from: draft.prompt)),
+                prompt: draft.prompt,
+                intent: draft.intent,
+                requiresClarification: false,
+                clarificationQuestion: "",
+                clarificationOptions: [],
+                clarificationAnswer: answer,
+                generatedReply: summary,
+                actionPlan: finalSteps
+            )
+
+            var task = finalizeTask(from: resultDraft)
+            task.backendTaskID = taskID
+            if let category = payload.category?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty {
+                task.category = category
+            }
+            task.latestAIOutput = summary
+            task.currentNextStep = finalSteps.first ?? task.currentNextStep
+            task.lastEventPreview = "Analysis complete."
+            return .taskAnalysis(task)
+        case let .multiTaskSplitPreview(_, payload):
+            let itemTitles = payload.items.map(\.title).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let fallbackMessage = "Multiple tasks were detected. Split-task confirmation is not connected yet in this build."
+            let message = firstNonEmpty(payload.message, payload.title, fallbackMessage)
+            let details = itemTitles.isEmpty ? message : "\(message)\n\nSuggested tasks:\n- \(itemTitles.joined(separator: "\n- "))"
+            return .splitPreview(message: details)
+        }
+    }
+
+    @MainActor
+    func requestReplyRegeneration(
+        taskID: UUID,
+        tone: String,
+        language: String
+    ) async throws -> GenerateReplyResponse {
+        guard shouldUseRemoteTaskActions else {
+            throw TaskActionServiceError.remoteActionsDisabled
+        }
+
+        guard let task = task(for: taskID) else {
+            throw TaskActionServiceError.invalidResponse
+        }
+
+        guard let backendTaskID = task.backendTaskID, !backendTaskID.isEmpty else {
+            throw TaskActionServiceError.missingBackendTaskID
+        }
+
+        let request = GenerateReplyRequest(
+            taskID: backendTaskID,
+            tone: tone,
+            language: language
+        )
+
+        let response = try await services.taskService.submitGenerateReply(
+            request,
+            idempotencyKey: UUID().uuidString.lowercased()
+        )
+
+        updateTask(taskID) { task in
+            task.replyDraft = response.message
+            task.generatedReply = response.message
+            task.latestAIOutput = response.message
+            task.lastEventPreview = "Reply regenerated."
+            task.timeline.append(
+                TaskTimelineEntry(
+                    title: "Reply regenerated",
+                    detail: "Tone: \(tone), Language: \(language).",
+                    date: Date()
+                )
+            )
+        }
+
+        return response
+    }
+
+    @MainActor
+    func markTaskSentAndSync(_ taskID: UUID, sentMessage: String) async -> String? {
+        markTaskWaitingForReply(taskID, sentMessage: sentMessage)
+
+        guard shouldUseRemoteTaskActions else {
+            return nil
+        }
+
+        guard let task = task(for: taskID), let backendTaskID = task.backendTaskID, !backendTaskID.isEmpty else {
+            return "Marked as sent locally. This task is not linked to backend yet."
+        }
+
+        let request = MessageMarkedSentRequest(
+            taskID: backendTaskID,
+            sentAtISO8601: ISO8601DateFormatter().string(from: Date())
+        )
+
+        do {
+            let response = try await services.taskService.submitMessageMarkedSent(
+                request,
+                idempotencyKey: UUID().uuidString.lowercased()
+            )
+
+            let normalizedStatus = TaskStatus.fromBackend(response.status)
+            if normalizedStatus != .new {
+                updateTask(taskID) { task in
+                    task.status = normalizedStatus
+                }
+            }
+            return nil
+        } catch {
+            return "Marked as sent locally, but backend sync failed. \(friendlyRemoteErrorMessage(error))"
+        }
+    }
+
+    @MainActor
+    func updateTaskStatusAndSync(
+        _ taskID: UUID,
+        to status: TaskStatus,
+        reason: String? = nil
+    ) async -> String? {
+        updateTask(taskID) { task in
+            task.status = status
+            task.lastEventPreview = "Status updated to \(status.displayTitle)."
+            task.timeline.append(
+                TaskTimelineEntry(
+                    title: "Status updated",
+                    detail: "Status changed to \(status.displayTitle).",
+                    date: Date()
+                )
+            )
+        }
+
+        guard shouldUseRemoteTaskActions else {
+            return nil
+        }
+
+        guard let task = task(for: taskID), let backendTaskID = task.backendTaskID, !backendTaskID.isEmpty else {
+            return "Status updated locally. This task is not linked to backend yet."
+        }
+
+        do {
+            _ = try await services.taskService.submitUpdateTaskStatus(
+                UpdateTaskStatusRequest(
+                    taskID: backendTaskID,
+                    status: status.backendValue,
+                    reason: reason
+                ),
+                idempotencyKey: UUID().uuidString.lowercased()
+            )
+            return nil
+        } catch {
+            return "Status updated locally, but backend sync failed. \(friendlyRemoteErrorMessage(error))"
+        }
+    }
+
     func finalizeTask(from draft: TaskDraft, status: TaskStatus = .ready) -> MockTask {
         services.taskService.createTask(from: draft, status: status)
     }
@@ -534,6 +733,42 @@ final class AppState {
                 services.reminderService.cancelReminder(identifier: previousID)
             }
 
+            var backendSyncWarning: String?
+
+            if shouldUseRemoteTaskActions,
+               let backendTaskID = existingTask.backendTaskID,
+               !backendTaskID.isEmpty {
+                do {
+                    let syncResponse: ReminderSyncResponse
+                    if let existingReminderID = existingTask.backendReminderID {
+                        syncResponse = try await services.reminderService.syncReminderUpdate(
+                            ReminderUpdateRequest(
+                                taskID: backendTaskID,
+                                reminderID: existingReminderID,
+                                remindAtISO8601: ISO8601DateFormatter().string(from: safeDate),
+                                iosNotificationID: identifier
+                            )
+                        )
+                    } else {
+                        syncResponse = try await services.reminderService.syncReminderCreate(
+                            ReminderCreateRequest(
+                                taskID: backendTaskID,
+                                remindAtISO8601: ISO8601DateFormatter().string(from: safeDate),
+                                iosNotificationID: identifier
+                            )
+                        )
+                    }
+
+                    updateTask(taskID) { task in
+                        if let reminderID = syncResponse.reminderID, !reminderID.isEmpty {
+                            task.backendReminderID = reminderID
+                        }
+                    }
+                } catch {
+                    backendSyncWarning = friendlyRemoteErrorMessage(error)
+                }
+            }
+
             updateTask(taskID) { task in
                 task.reminderDate = safeDate
                 task.reminderNotificationID = identifier
@@ -547,10 +782,14 @@ final class AppState {
                 )
             }
 
-            return ReminderActionFeedback(
-                kind: .success,
-                message: "Reminder set for \(friendlyDateTime(safeDate))."
-            )
+            if let backendSyncWarning {
+                return ReminderActionFeedback(
+                    kind: .warning,
+                    message: "Reminder set for \(friendlyDateTime(safeDate)) on this device, but backend sync failed. \(backendSyncWarning)"
+                )
+            }
+
+            return ReminderActionFeedback(kind: .success, message: "Reminder set for \(friendlyDateTime(safeDate)).")
         case .permissionDenied:
             return ReminderActionFeedback(
                 kind: .warning,
@@ -578,9 +817,27 @@ final class AppState {
             services.reminderService.cancelReminder(identifier: reminderID)
         }
 
+        var backendSyncWarning: String?
+        if shouldUseRemoteTaskActions,
+           let backendTaskID = existingTask.backendTaskID,
+           !backendTaskID.isEmpty {
+            do {
+                _ = try await services.reminderService.syncReminderCancel(
+                    ReminderCancelRequest(
+                        taskID: backendTaskID,
+                        reminderID: existingTask.backendReminderID,
+                        iosNotificationID: existingTask.reminderNotificationID
+                    )
+                )
+            } catch {
+                backendSyncWarning = friendlyRemoteErrorMessage(error)
+            }
+        }
+
         updateTask(taskID) { task in
             task.reminderDate = nil
             task.reminderNotificationID = nil
+            task.backendReminderID = nil
             task.lastEventPreview = "Reminder canceled."
             task.timeline.append(
                 TaskTimelineEntry(
@@ -588,6 +845,13 @@ final class AppState {
                     detail: "Local reminder removed.",
                     date: Date()
                 )
+            )
+        }
+
+        if let backendSyncWarning {
+            return ReminderActionFeedback(
+                kind: .warning,
+                message: "Reminder canceled on this device, but backend sync failed. \(backendSyncWarning)"
             )
         }
 
@@ -604,11 +868,77 @@ final class AppState {
         let snoozeDate = Calendar.current.date(byAdding: .hour, value: max(1, hours), to: baseDate) ??
             Date().addingTimeInterval(3600)
 
-        return await scheduleTaskReminder(
-            taskID,
-            on: snoozeDate,
-            context: "Reminder snoozed by \(max(1, hours)) hour."
+        let scheduleResult = await services.reminderService.scheduleReminder(
+            taskTitle: existingTask.title,
+            date: snoozeDate
         )
+
+        switch scheduleResult {
+        case let .scheduled(identifier):
+            if let previousID = existingTask.reminderNotificationID {
+                services.reminderService.cancelReminder(identifier: previousID)
+            }
+
+            var backendSyncWarning: String?
+            if shouldUseRemoteTaskActions,
+               let backendTaskID = existingTask.backendTaskID,
+               !backendTaskID.isEmpty {
+                do {
+                    let syncResponse = try await services.reminderService.syncReminderSnooze(
+                        ReminderSnoozeRequest(
+                            taskID: backendTaskID,
+                            reminderID: existingTask.backendReminderID,
+                            iosNotificationID: identifier,
+                            remindAtISO8601: ISO8601DateFormatter().string(from: snoozeDate),
+                            snoozeMinutes: max(1, hours) * 60
+                        )
+                    )
+
+                    updateTask(taskID) { task in
+                        if let reminderID = syncResponse.reminderID, !reminderID.isEmpty {
+                            task.backendReminderID = reminderID
+                        }
+                    }
+                } catch {
+                    backendSyncWarning = friendlyRemoteErrorMessage(error)
+                }
+            }
+
+            updateTask(taskID) { task in
+                task.reminderDate = snoozeDate
+                task.reminderNotificationID = identifier
+                task.lastEventPreview = "Reminder snoozed."
+                task.timeline.append(
+                    TaskTimelineEntry(
+                        title: "Reminder snoozed",
+                        detail: "Reminder snoozed by \(max(1, hours)) hour.",
+                        date: Date()
+                    )
+                )
+            }
+
+            if let backendSyncWarning {
+                return ReminderActionFeedback(
+                    kind: .warning,
+                    message: "Reminder snoozed on this device, but backend sync failed. \(backendSyncWarning)"
+                )
+            }
+
+            return ReminderActionFeedback(
+                kind: .success,
+                message: "Reminder snoozed until \(friendlyDateTime(snoozeDate))."
+            )
+        case .permissionDenied:
+            return ReminderActionFeedback(
+                kind: .warning,
+                message: "Notifications are off for OneDone. Enable them in Settings to snooze reminders."
+            )
+        case .failed:
+            return ReminderActionFeedback(
+                kind: .warning,
+                message: "Could not snooze reminder right now. Please try again."
+            )
+        }
     }
 
     @MainActor
@@ -679,6 +1009,14 @@ final class AppState {
             }
         }
         return ""
+    }
+
+    private func friendlyRemoteErrorMessage(_ error: Error) -> String {
+        if let localizedError = error as? LocalizedError, let message = localizedError.errorDescription {
+            return message
+        }
+
+        return "Please try again."
     }
 
     private func updateTask(_ taskID: UUID, update: (inout MockTask) -> Void) {

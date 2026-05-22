@@ -186,23 +186,45 @@ struct AnalyzeTaskResponse: Codable {
 struct AnswerClarificationRequest: Codable {
     var taskID: String
     var answer: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case answer
+    }
 }
 
 struct AnswerClarificationResponse: Codable {
     var taskID: String
     var nextStepSummary: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case nextStepSummary = "next_step_summary"
+    }
 }
 
 struct GenerateReplyRequest: Codable {
     var taskID: String
     var tone: String?
     var language: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case tone
+        case language
+    }
 }
 
 struct GenerateReplyResponse: Codable {
     var taskID: String
     var subject: String?
     var message: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case subject
+        case message
+    }
 }
 
 struct ValidateSubscriptionRequest: Codable {
@@ -220,19 +242,245 @@ struct RestorePurchasesResponse: Codable {
 struct MessageMarkedSentRequest: Codable {
     var taskID: String
     var sentAtISO8601: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case sentAtISO8601 = "sent_at"
+    }
 }
 
 struct MessageMarkedSentResponse: Codable {
     var taskID: String
     var status: String
+    var message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case status
+        case message
+    }
 }
 
 struct ProcessIncomingReplyRequest: Codable {
     var taskID: String
     var replyText: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case replyText = "reply_text"
+    }
 }
 
 struct ProcessIncomingReplyResponse: Codable {
     var taskID: String
     var status: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case status
+    }
+}
+
+struct UpdateTaskStatusRequest: Codable {
+    var taskID: String
+    var status: String
+    var reason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case status
+        case reason
+    }
+}
+
+struct UpdateTaskStatusResponse: Codable {
+    var taskID: String
+    var status: String
+    var message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case status
+        case message
+    }
+}
+
+struct ReminderCreateRequest: Codable {
+    var taskID: String
+    var remindAtISO8601: String
+    var iosNotificationID: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case remindAtISO8601 = "remind_at"
+        case iosNotificationID = "ios_notification_id"
+    }
+}
+
+struct ReminderUpdateRequest: Codable {
+    var taskID: String
+    var reminderID: String?
+    var remindAtISO8601: String
+    var iosNotificationID: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case reminderID = "reminder_id"
+        case remindAtISO8601 = "remind_at"
+        case iosNotificationID = "ios_notification_id"
+    }
+}
+
+struct ReminderCancelRequest: Codable {
+    var taskID: String
+    var reminderID: String?
+    var iosNotificationID: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case reminderID = "reminder_id"
+        case iosNotificationID = "ios_notification_id"
+    }
+}
+
+struct ReminderSnoozeRequest: Codable {
+    var taskID: String
+    var reminderID: String?
+    var iosNotificationID: String
+    var remindAtISO8601: String
+    var snoozeMinutes: Int
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case reminderID = "reminder_id"
+        case iosNotificationID = "ios_notification_id"
+        case remindAtISO8601 = "remind_at"
+        case snoozeMinutes = "snooze_minutes"
+    }
+}
+
+struct ReminderSyncResponse: Codable {
+    var taskID: String?
+    var reminderID: String?
+    var status: String?
+    var message: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case reminderID = "reminder_id"
+        case status
+        case message
+    }
+}
+
+struct BackendTaskSummaryDTO: Decodable {
+    var taskID: String
+    var title: String?
+    var status: String?
+    var category: String?
+    var currentNextStep: String?
+    var lastEventPreview: String?
+    var dueAtISO8601: String?
+    var reminderAtISO8601: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case title
+        case status
+        case category
+        case currentNextStep = "current_next_step"
+        case lastEventPreview = "last_event_preview"
+        case dueAtISO8601 = "due_at"
+        case reminderAtISO8601 = "reminder_at"
+    }
+}
+
+struct BackendTaskDetailDTO: Decodable {
+    var taskID: String
+    var title: String?
+    var status: String?
+    var category: String?
+    var prompt: String?
+    var clarification: String?
+    var latestOutput: String?
+    var generatedReply: String?
+    var currentNextStep: String?
+    var dueAtISO8601: String?
+    var reminderAtISO8601: String?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case title
+        case status
+        case category
+        case prompt
+        case clarification
+        case latestOutput = "latest_output"
+        case generatedReply = "generated_reply"
+        case currentNextStep = "current_next_step"
+        case dueAtISO8601 = "due_at"
+        case reminderAtISO8601 = "reminder_at"
+    }
+}
+
+struct BackendTaskOutputDTO: Decodable {
+    var outputID: String?
+    var taskID: String?
+    var content: String?
+    var kind: String?
+    var createdAtISO8601: String?
+
+    enum CodingKeys: String, CodingKey {
+        case outputID = "output_id"
+        case taskID = "task_id"
+        case content
+        case kind
+        case createdAtISO8601 = "created_at"
+    }
+}
+
+struct BackendTaskEventDTO: Decodable {
+    var eventID: String?
+    var taskID: String?
+    var title: String?
+    var detail: String?
+    var createdAtISO8601: String?
+
+    enum CodingKeys: String, CodingKey {
+        case eventID = "event_id"
+        case taskID = "task_id"
+        case title
+        case detail
+        case createdAtISO8601 = "created_at"
+    }
+}
+
+struct BackendChecklistItemDTO: Decodable {
+    var itemID: String?
+    var taskID: String?
+    var text: String?
+    var isDone: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case itemID = "item_id"
+        case taskID = "task_id"
+        case text
+        case isDone = "is_done"
+    }
+}
+
+struct BackendReminderDTO: Decodable {
+    var reminderID: String?
+    var taskID: String?
+    var remindAtISO8601: String?
+    var iosNotificationID: String?
+    var status: String?
+
+    enum CodingKeys: String, CodingKey {
+        case reminderID = "reminder_id"
+        case taskID = "task_id"
+        case remindAtISO8601 = "remind_at"
+        case iosNotificationID = "ios_notification_id"
+        case status
+    }
 }
