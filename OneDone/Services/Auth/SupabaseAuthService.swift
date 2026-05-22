@@ -2,26 +2,41 @@ import Foundation
 
 enum SupabaseAuthServiceError: LocalizedError {
     case missingConfiguration
+    case missingEmail
+    case missingPassword
+    case weakPassword(minimumLength: Int)
     case invalidCredentials(message: String)
+    case emailNotConfirmed
     case unauthorized(message: String)
     case retryable(message: String)
     case invalidResponse
     case sessionMissingAfterLogin
+    case invalidRequestPayload
 
     var errorDescription: String? {
         switch self {
         case .missingConfiguration:
             return "Supabase Auth configuration is missing. Set ONEDONE_SUPABASE_URL and ONEDONE_SUPABASE_ANON_KEY."
+        case .missingEmail:
+            return "Enter your email to continue."
+        case .missingPassword:
+            return "Enter your password to continue."
+        case let .weakPassword(minimumLength):
+            return "Password must be at least \(minimumLength) characters."
         case let .invalidCredentials(message):
             return message
+        case .emailNotConfirmed:
+            return "Your email is not confirmed yet. Check your inbox and confirm your account."
         case let .unauthorized(message):
             return message
         case let .retryable(message):
             return message
         case .invalidResponse:
-            return "Could not understand Supabase Auth response."
+            return "Unexpected auth response. Please try again."
         case .sessionMissingAfterLogin:
-            return "Login succeeded but no session was returned."
+            return "Could not start your session after login. Please try again."
+        case .invalidRequestPayload:
+            return "Could not prepare auth request. Please try again."
         }
     }
 }
@@ -34,6 +49,8 @@ protocol SupabaseAuthServiceProtocol {
 }
 
 struct SupabaseAuthService: SupabaseAuthServiceProtocol {
+    private static let minimumPasswordLength = 6
+
     let environment: APIEnvironment
     let urlSession: URLSession
 
@@ -43,6 +60,9 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
     }
 
     func signUp(email: String, password: String) async throws -> AuthSignUpResult {
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        try validateCredentials(email: normalizedEmail, password: password)
+
         struct RequestBody: Encodable {
             let email: String
             let password: String
@@ -51,7 +71,7 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
         let data = try await requestJSON(
             path: "signup",
             method: "POST",
-            body: RequestBody(email: email, password: password)
+            body: RequestBody(email: normalizedEmail, password: password)
         )
 
         guard let decoded = try? JSONDecoder().decode(SupabaseAuthSignUpResponseDTO.self, from: data) else {
@@ -62,20 +82,23 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
             return .authenticated(StoredAuthSession.from(dto: sessionDTO))
         }
 
-        return .requiresEmailConfirmation(email: email)
+        return .requiresEmailConfirmation(email: normalizedEmail)
     }
 
     func logIn(email: String, password: String) async throws -> StoredAuthSession {
-        let formValues = [
-            URLQueryItem(name: "email", value: email),
-            URLQueryItem(name: "password", value: password)
-        ]
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        try validateCredentials(email: normalizedEmail, password: password)
 
-        let data = try await requestForm(
+        struct RequestBody: Encodable {
+            let email: String
+            let password: String
+        }
+
+        let data = try await requestJSON(
             path: "token",
             queryItems: [URLQueryItem(name: "grant_type", value: "password")],
             method: "POST",
-            formValues: formValues
+            body: RequestBody(email: normalizedEmail, password: password)
         )
 
         guard let dto = try? JSONDecoder().decode(SupabaseAuthSessionDTO.self, from: data) else {
@@ -86,15 +109,23 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
     }
 
     func refreshSession(refreshToken: String) async throws -> StoredAuthSession {
-        let formValues = [
-            URLQueryItem(name: "refresh_token", value: refreshToken)
-        ]
+        guard !refreshToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SupabaseAuthServiceError.invalidRequestPayload
+        }
 
-        let data = try await requestForm(
+        struct RequestBody: Encodable {
+            let refreshToken: String
+
+            enum CodingKeys: String, CodingKey {
+                case refreshToken = "refresh_token"
+            }
+        }
+
+        let data = try await requestJSON(
             path: "token",
             queryItems: [URLQueryItem(name: "grant_type", value: "refresh_token")],
             method: "POST",
-            formValues: formValues
+            body: RequestBody(refreshToken: refreshToken)
         )
 
         guard let dto = try? JSONDecoder().decode(SupabaseAuthSessionDTO.self, from: data) else {
@@ -126,11 +157,21 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
 
     private func requestJSON<T: Encodable>(
         path: String,
+        queryItems: [URLQueryItem] = [],
         method: String,
         body: T
     ) async throws -> Data {
         let (supabaseURL, anonKey) = try requireConfig()
-        let url = try authURL(base: supabaseURL, path: path)
+        let baseURL = try authURL(base: supabaseURL, path: path)
+
+        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+
+        guard let url = components?.url else {
+            throw SupabaseAuthServiceError.invalidRequestPayload
+        }
 
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -138,36 +179,10 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-        request.httpBody = try JSONEncoder().encode(body)
 
-        return try await perform(request: request)
-    }
-
-    private func requestForm(
-        path: String,
-        queryItems: [URLQueryItem],
-        method: String,
-        formValues: [URLQueryItem]
-    ) async throws -> Data {
-        let (supabaseURL, anonKey) = try requireConfig()
-        let baseURL = try authURL(base: supabaseURL, path: path)
-        var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)
-        components?.queryItems = queryItems
-
-        guard let url = components?.url else {
-            throw SupabaseAuthServiceError.invalidResponse
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.setValue(anonKey, forHTTPHeaderField: "apikey")
-        request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
-
-        var formComponents = URLComponents()
-        formComponents.queryItems = formValues
-        request.httpBody = formComponents.percentEncodedQuery?.data(using: .utf8)
+        let encodedBody = try JSONEncoder().encode(body)
+        try validateRequestBody(encodedBody)
+        request.httpBody = encodedBody
 
         return try await perform(request: request)
     }
@@ -183,21 +198,12 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
                 return data
             }
 
-            let message = decodeErrorMessage(data) ?? "Auth request failed. Please try again."
+            let mappedError = mapAuthError(
+                statusCode: httpResponse.statusCode,
+                rawMessage: decodeErrorMessage(data)
+            )
 
-            switch httpResponse.statusCode {
-            case 400, 401:
-                throw SupabaseAuthServiceError.invalidCredentials(message: message)
-            case 403:
-                throw SupabaseAuthServiceError.unauthorized(message: message)
-            case 408, 409, 425, 429:
-                throw SupabaseAuthServiceError.retryable(message: message)
-            default:
-                if httpResponse.statusCode >= 500 {
-                    throw SupabaseAuthServiceError.retryable(message: message)
-                }
-                throw SupabaseAuthServiceError.retryable(message: message)
-            }
+            throw mappedError
         } catch let error as SupabaseAuthServiceError {
             throw error
         } catch let error as URLError {
@@ -214,6 +220,32 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
         }
     }
 
+    private func validateCredentials(email: String, password: String) throws {
+        if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw SupabaseAuthServiceError.missingEmail
+        }
+
+        if password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            throw SupabaseAuthServiceError.missingPassword
+        }
+
+        if password.count < Self.minimumPasswordLength {
+            throw SupabaseAuthServiceError.weakPassword(minimumLength: Self.minimumPasswordLength)
+        }
+    }
+
+    private func validateRequestBody(_ body: Data) throws {
+        guard !body.isEmpty else {
+            throw SupabaseAuthServiceError.invalidRequestPayload
+        }
+
+        if let jsonObject = try? JSONSerialization.jsonObject(with: body),
+           let dictionary = jsonObject as? [String: Any],
+           dictionary.isEmpty {
+            throw SupabaseAuthServiceError.invalidRequestPayload
+        }
+    }
+
     private func decodeErrorMessage(_ data: Data) -> String? {
         if let decoded = try? JSONDecoder().decode(SupabaseAuthErrorDTO.self, from: data) {
             return decoded.message ?? decoded.errorDescription ?? decoded.msg ?? decoded.error
@@ -227,6 +259,47 @@ struct SupabaseAuthService: SupabaseAuthServiceProtocol {
             throw SupabaseAuthServiceError.missingConfiguration
         }
         return (supabaseURL, anonKey)
+    }
+
+    private func mapAuthError(statusCode: Int, rawMessage: String?) -> SupabaseAuthServiceError {
+        let normalized = (rawMessage ?? "").lowercased()
+
+        if normalized.contains("email not confirmed") {
+            return .emailNotConfirmed
+        }
+
+        if normalized.contains("could not parse request body as json") ||
+            normalized.contains("unexpected end of json input") {
+            return .retryable(message: "Could not process login request right now. Please try again.")
+        }
+
+        if normalized.contains("invalid login credentials") ||
+            normalized.contains("invalid_grant") ||
+            normalized.contains("invalid credentials") {
+            return .invalidCredentials(message: "Email or password is incorrect.")
+        }
+
+        if normalized.contains("email") && normalized.contains("required") {
+            return .missingEmail
+        }
+
+        if normalized.contains("password") && normalized.contains("required") {
+            return .missingPassword
+        }
+
+        switch statusCode {
+        case 400, 401:
+            return .invalidCredentials(message: "Email or password is incorrect.")
+        case 403:
+            return .unauthorized(message: "This account cannot log in right now. Please try again.")
+        case 408, 409, 425, 429:
+            return .retryable(message: "Auth service is temporarily unavailable. Please try again.")
+        default:
+            if statusCode >= 500 {
+                return .retryable(message: "Auth service is temporarily unavailable. Please try again.")
+            }
+            return .retryable(message: "Could not complete authentication right now. Please try again.")
+        }
     }
 
     private func authURL(base: URL, path: String) throws -> URL {
