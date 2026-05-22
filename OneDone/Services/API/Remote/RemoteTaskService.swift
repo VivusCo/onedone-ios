@@ -215,7 +215,24 @@ struct RemoteTaskService: TaskServiceProtocol {
 
         struct EmptyBody: Codable {}
         let data = try await postEdgeFunction(path: "functions/v1/list-tasks", body: EmptyBody(), idempotencyKey: nil)
-        return decodeArrayWrapper(data, as: BackendTaskSummaryDTO.self) ?? []
+
+        if let direct = decodeArrayWrapper(data, as: BackendTaskSummaryDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeArrayByKeys(data, keys: ["tasks", "items", "task_list"], as: BackendTaskSummaryDTO.self) {
+            return keyed
+        }
+
+        if let single = decodeSingleWrapper(data, as: BackendTaskSummaryDTO.self) {
+            return [single]
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return []
+        }
+
+        throw TaskActionServiceError.invalidResponse
     }
 
     func fetchTaskDetail(taskID: String) async throws -> BackendTaskDetailDTO? {
@@ -236,7 +253,19 @@ struct RemoteTaskService: TaskServiceProtocol {
             idempotencyKey: nil
         )
 
-        return decodeSingleWrapper(data, as: BackendTaskDetailDTO.self)
+        if let direct = decodeSingleWrapper(data, as: BackendTaskDetailDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeSingleByKeys(data, keys: ["task", "detail", "item"], as: BackendTaskDetailDTO.self) {
+            return keyed
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return nil
+        }
+
+        throw TaskActionServiceError.invalidResponse
     }
 
     func fetchTaskOutputs(taskID: String) async throws -> [BackendTaskOutputDTO] {
@@ -510,6 +539,73 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         return nil
+    }
+
+    private func decodeSingleByKeys<T: Decodable>(_ data: Data, keys: [String], as type: T.Type) -> T? {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return nil
+        }
+
+        for key in keys {
+            guard let nested = dictionary[key],
+                  JSONSerialization.isValidJSONObject(nested),
+                  let nestedData = try? JSONSerialization.data(withJSONObject: nested) else {
+                continue
+            }
+
+            if let decoded = decodeSingleWrapper(nestedData, as: type) {
+                return decoded
+            }
+        }
+
+        return nil
+    }
+
+    private func decodeArrayByKeys<T: Decodable>(_ data: Data, keys: [String], as type: T.Type) -> [T]? {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return nil
+        }
+
+        for key in keys {
+            guard let nested = dictionary[key],
+                  JSONSerialization.isValidJSONObject(nested),
+                  let nestedData = try? JSONSerialization.data(withJSONObject: nested) else {
+                continue
+            }
+
+            if let decoded = decodeArrayWrapper(nestedData, as: type) {
+                return decoded
+            }
+        }
+
+        return nil
+    }
+
+    private func isEmptyCollectionPayload(_ data: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: data) else {
+            return false
+        }
+
+        if let array = object as? [Any] {
+            return array.isEmpty
+        }
+
+        if let dictionary = object as? [String: Any] {
+            if dictionary.isEmpty {
+                return true
+            }
+
+            let emptyKeys = ["data", "result", "response", "payload", "tasks", "items"]
+            for key in emptyKeys {
+                if let value = dictionary[key] as? [Any], value.isEmpty {
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     private func classifyAnalyzePayloadError(_ payload: AnalyzeTaskResponseDTO) -> AnalyzeTaskServiceError? {

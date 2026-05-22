@@ -665,6 +665,7 @@ struct BackendTaskSummaryDTO: Decodable {
     var title: String?
     var status: String?
     var category: String?
+    var createdAtISO8601: String?
     var currentNextStep: String?
     var lastEventPreview: String?
     var dueAtISO8601: String?
@@ -675,6 +676,7 @@ struct BackendTaskSummaryDTO: Decodable {
         case title
         case status
         case category
+        case createdAtISO8601 = "created_at"
         case currentNextStep = "current_next_step"
         case lastEventPreview = "last_event_preview"
         case dueAtISO8601 = "due_at"
@@ -687,6 +689,7 @@ struct BackendTaskDetailDTO: Decodable {
     var title: String?
     var status: String?
     var category: String?
+    var createdAtISO8601: String?
     var prompt: String?
     var clarification: String?
     var latestOutput: String?
@@ -700,6 +703,7 @@ struct BackendTaskDetailDTO: Decodable {
         case title
         case status
         case category
+        case createdAtISO8601 = "created_at"
         case prompt
         case clarification
         case latestOutput = "latest_output"

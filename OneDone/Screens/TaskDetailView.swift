@@ -10,6 +10,9 @@ struct TaskDetailView: View {
     @State private var showCustomDatePicker: Bool = false
     @State private var customReminderDate: Date =
         Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86_400)
+    @State private var isLoadingRemoteTaskDetail: Bool = false
+    @State private var remoteDetailErrorMessage: String?
+    @State private var hasTriggeredInitialRemoteLoad: Bool = false
 
     private var task: MockTask? {
         appState.task(for: taskID)
@@ -22,6 +25,34 @@ struct TaskDetailView: View {
                     title: "Task Detail",
                     subtitle: "Keep momentum with clear next steps"
                 )
+
+                if let remoteDetailErrorMessage {
+                    ODInfoBanner(
+                        title: "Could not load task detail",
+                        message: remoteDetailErrorMessage,
+                        icon: "exclamationmark.triangle.fill",
+                        tone: .warning
+                    )
+
+                    ODSecondaryButton(title: "Retry", icon: "arrow.clockwise") {
+                        Task {
+                            await refreshRemoteTaskDetail(showLoading: true)
+                        }
+                    }
+                }
+
+                if shouldShowRemoteLoadingState {
+                    ODCard {
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            ProgressView()
+                                .tint(ODColor.primary)
+                            Text("Loading task details...")
+                                .font(OneDoneStyle.bodyFont)
+                                .foregroundStyle(ODColor.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
 
                 if let task {
                     headerSection(task)
@@ -38,7 +69,11 @@ struct TaskDetailView: View {
                     timelineSection(task)
                 } else {
                     ODCard {
-                        Text("Task no longer exists in mock state.")
+                        Text(
+                            appState.shouldUseRemoteTaskActions
+                                ? "Task details are not available yet. Pull to refresh or return to My Tasks."
+                                : "Task no longer exists in mock state."
+                        )
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
@@ -51,6 +86,12 @@ struct TaskDetailView: View {
         .oneDoneScreen()
         .sheet(isPresented: $showCustomDatePicker) {
             customDateSheet
+        }
+        .refreshable {
+            await refreshRemoteTaskDetail(showLoading: false)
+        }
+        .task {
+            await loadRemoteTaskDetailIfNeeded()
         }
     }
 
@@ -452,6 +493,44 @@ struct TaskDetailView: View {
         case .done:
             return .success
         }
+    }
+
+    private var canLoadRemoteTaskDetail: Bool {
+        appState.shouldUseRemoteTaskActions &&
+            (task?.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+    }
+
+    private var shouldShowRemoteLoadingState: Bool {
+        canLoadRemoteTaskDetail && isLoadingRemoteTaskDetail
+    }
+
+    @MainActor
+    private func loadRemoteTaskDetailIfNeeded() async {
+        guard canLoadRemoteTaskDetail else {
+            remoteDetailErrorMessage = nil
+            return
+        }
+
+        guard !hasTriggeredInitialRemoteLoad else { return }
+        hasTriggeredInitialRemoteLoad = true
+        await refreshRemoteTaskDetail(showLoading: true)
+    }
+
+    @MainActor
+    private func refreshRemoteTaskDetail(showLoading: Bool) async {
+        guard canLoadRemoteTaskDetail else {
+            remoteDetailErrorMessage = nil
+            isLoadingRemoteTaskDetail = false
+            return
+        }
+
+        if showLoading {
+            isLoadingRemoteTaskDetail = true
+        }
+
+        let loadError = await appState.refreshTaskDetailFromRemote(taskID: taskID)
+        remoteDetailErrorMessage = loadError
+        isLoadingRemoteTaskDetail = false
     }
 }
 

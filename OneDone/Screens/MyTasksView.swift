@@ -4,6 +4,9 @@ import Observation
 struct MyTasksView: View {
     @Bindable var appState: AppState
     @State private var selectedFilter: MyTasksFilter = .all
+    @State private var isLoadingRemoteTasks: Bool = false
+    @State private var remoteLoadErrorMessage: String?
+    @State private var hasTriggeredInitialRemoteLoad: Bool = false
 
     var body: some View {
         ScrollView {
@@ -21,6 +24,34 @@ struct MyTasksView: View {
                 )
 
                 filterBar
+
+                if let remoteLoadErrorMessage {
+                    ODInfoBanner(
+                        title: "Could not load tasks",
+                        message: remoteLoadErrorMessage,
+                        icon: "exclamationmark.triangle.fill",
+                        tone: .warning
+                    )
+
+                    ODSecondaryButton(title: "Retry", icon: "arrow.clockwise") {
+                        Task {
+                            await refreshRemoteTasks(showLoading: true)
+                        }
+                    }
+                }
+
+                if shouldShowRemoteLoadingState {
+                    ODCard {
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            ProgressView()
+                                .tint(ODColor.primary)
+                            Text("Loading tasks...")
+                                .font(OneDoneStyle.bodyFont)
+                                .foregroundStyle(ODColor.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
 
                 if filteredAndSortedTasks.isEmpty {
                     ODCard {
@@ -44,6 +75,12 @@ struct MyTasksView: View {
         .navigationTitle("My Tasks")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+        .refreshable {
+            await refreshRemoteTasks(showLoading: false)
+        }
+        .task {
+            await loadTasksIfNeeded()
+        }
     }
 
     private var filterBar: some View {
@@ -156,9 +193,15 @@ struct MyTasksView: View {
 
     private var emptyStateText: String {
         if selectedFilter == .all {
-            return "No tasks yet. Create one from Home."
+            return appState.shouldUseRemoteTaskActions
+                ? "No tasks yet. Create one from Home to get started."
+                : "No tasks yet. Create one from Home."
         }
         return "No tasks in \(selectedFilter.rawValue) right now."
+    }
+
+    private var shouldShowRemoteLoadingState: Bool {
+        appState.shouldUseRemoteTaskActions && isLoadingRemoteTasks && appState.tasks.isEmpty
     }
 
     private func scheduleText(for task: MockTask) -> String? {
@@ -197,6 +240,35 @@ struct MyTasksView: View {
         case .done:
             return .success
         }
+    }
+
+    @MainActor
+    private func loadTasksIfNeeded() async {
+        guard appState.shouldUseRemoteTaskActions else {
+            remoteLoadErrorMessage = nil
+            return
+        }
+
+        guard !hasTriggeredInitialRemoteLoad else { return }
+        hasTriggeredInitialRemoteLoad = true
+        await refreshRemoteTasks(showLoading: true)
+    }
+
+    @MainActor
+    private func refreshRemoteTasks(showLoading: Bool) async {
+        guard appState.shouldUseRemoteTaskActions else {
+            remoteLoadErrorMessage = nil
+            isLoadingRemoteTasks = false
+            return
+        }
+
+        if showLoading {
+            isLoadingRemoteTasks = true
+        }
+
+        let loadError = await appState.refreshTasksFromRemote()
+        remoteLoadErrorMessage = loadError
+        isLoadingRemoteTasks = false
     }
 }
 
