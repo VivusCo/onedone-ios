@@ -94,6 +94,12 @@ struct ReminderActionFeedback {
     let message: String
 }
 
+enum NewTaskAnalysisResult {
+    case clarification(TaskDraft)
+    case taskAnalysis(MockTask)
+    case splitPreview(message: String)
+}
+
 @Observable
 final class AppState {
     enum Phase {
@@ -145,6 +151,7 @@ final class AppState {
     let services: AppServiceContainer
     private var didAttemptRemoteAccessBootstrap: Bool = false
     private var isRefreshingRemoteAccessState: Bool = false
+    private var forceMockTaskFlowInSession: Bool = false
 
     var templates: [TaskTemplate] = MockRepository.templates
     var tasks: [MockTask] = MockRepository.seedTasks
@@ -322,6 +329,7 @@ final class AppState {
         guard services.runtimeMode == .remoteAccessState else { return }
         accessStateLoadErrorMessage = nil
         pendingHomeGateState = nil
+        forceMockTaskFlowInSession = true
         setMockAccessState(.starter_active)
         phase = .welcome
 #endif
@@ -341,8 +349,108 @@ final class AppState {
         return gateState
     }
 
+    var shouldUseRemoteTaskAnalysis: Bool {
+        services.runtimeMode == .remoteAccessState && !forceMockTaskFlowInSession
+    }
+
     func makeDraft(prompt: String, template: TaskTemplate?) -> TaskDraft {
         services.taskService.analyzeTask(prompt: prompt, template: template)
+    }
+
+    @MainActor
+    func analyzeNewTask(
+        prompt: String,
+        selectedTemplate: TaskTemplate?,
+        idempotencyKey: String
+    ) async throws -> NewTaskAnalysisResult {
+        if !shouldUseRemoteTaskAnalysis {
+            let localDraft = makeDraft(prompt: prompt, template: selectedTemplate)
+
+            if localDraft.requiresClarification {
+                return .clarification(localDraft)
+            }
+
+            let localTask = finalizeTask(from: localDraft)
+            return .taskAnalysis(localTask)
+        }
+
+        let request = AnalyzeTaskRequest(
+            inputText: prompt,
+            selectedTemplate: selectedTemplate?.resolvedBackendTemplateID,
+            deadlineAtISO8601: nil,
+            contextNotes: nil
+        )
+
+        let remoteResponse = try await services.taskService.submitAnalyzeTask(
+            request,
+            idempotencyKey: idempotencyKey
+        )
+
+        switch remoteResponse {
+        case let .clarification(taskID, payload):
+            let question = payload.question?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalizedQuestion = (question?.isEmpty == false) ? question! : "I need one quick detail before I continue."
+            let options = payload.options
+            let title = payload.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let draft = TaskDraft(
+                backendTaskID: taskID,
+                title: (title?.isEmpty == false) ? title! : inferredTaskTitle(from: prompt),
+                prompt: prompt,
+                intent: selectedTemplate?.resolvedBackendTemplateID == "cancel_subscription" ? .cancelSubscription : .generic,
+                requiresClarification: true,
+                clarificationQuestion: normalizedQuestion,
+                clarificationOptions: options,
+                generatedReply: "I need one quick detail before giving exact steps.",
+                actionPlan: []
+            )
+
+            return .clarification(draft)
+        case let .taskAnalysis(taskID, payload):
+            let title = payload.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let summary = payload.summary?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let latestOutput = payload.latestOutput?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let checklist = payload.checklist.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let nextSteps = payload.nextSteps.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+            let finalSummary = firstNonEmpty(
+                summary,
+                latestOutput,
+                "Task analysis completed. Review the next step and continue."
+            )
+            let finalSteps = !nextSteps.isEmpty ? nextSteps : (!checklist.isEmpty ? checklist : ["Review the recommendation and take the first action."])
+
+            let draft = TaskDraft(
+                backendTaskID: taskID,
+                title: firstNonEmpty(title, inferredTaskTitle(from: prompt)),
+                prompt: prompt,
+                intent: selectedTemplate?.resolvedBackendTemplateID == "cancel_subscription" ? .cancelSubscription : .generic,
+                requiresClarification: false,
+                clarificationQuestion: "",
+                clarificationOptions: [],
+                generatedReply: finalSummary,
+                actionPlan: finalSteps
+            )
+
+            var task = finalizeTask(from: draft)
+            task.backendTaskID = taskID
+
+            if let category = payload.category?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty {
+                task.category = category
+            }
+
+            task.latestAIOutput = finalSummary
+            task.currentNextStep = finalSteps.first ?? task.currentNextStep
+            task.lastEventPreview = "Analysis complete."
+
+            return .taskAnalysis(task)
+        case let .multiTaskSplitPreview(_, payload):
+            let itemTitles = payload.items.map(\.title).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            let fallbackMessage = "Multiple tasks were detected. Split-task confirmation is not connected yet in this build."
+            let message = firstNonEmpty(payload.message, payload.title, fallbackMessage)
+            let details = itemTitles.isEmpty ? message : "\(message)\n\nSuggested tasks:\n- \(itemTitles.joined(separator: "\n- "))"
+            return .splitPreview(message: details)
+        }
     }
 
     func applyClarification(answer: String, to draft: TaskDraft) -> TaskDraft {
@@ -358,7 +466,15 @@ final class AppState {
     }
 
     func saveTask(_ task: MockTask) {
-        guard !tasks.contains(where: { $0.id == task.id }) else { return }
+        if tasks.contains(where: { $0.id == task.id }) {
+            return
+        }
+
+        if let backendTaskID = task.backendTaskID,
+           tasks.contains(where: { $0.backendTaskID == backendTaskID }) {
+            return
+        }
+
         tasks.insert(task, at: 0)
     }
 
@@ -548,6 +664,21 @@ final class AppState {
         }
 
         return "We could not load your access state right now. Please check your connection and try again."
+    }
+
+    private func inferredTaskTitle(from prompt: String) -> String {
+        let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "New task" }
+        return String(trimmed.prefix(36))
+    }
+
+    private func firstNonEmpty(_ values: String?...) -> String {
+        for value in values {
+            if let value, !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return value
+            }
+        }
+        return ""
     }
 
     private func updateTask(_ taskID: UUID, update: (inout MockTask) -> Void) {
