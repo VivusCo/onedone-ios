@@ -214,6 +214,8 @@ struct NewTaskView: View {
         case let .accessDenied(message):
             submitErrorMessage = message
             showSubscriptionGate = true
+        case let .rateLimited(message):
+            submitErrorMessage = message
         default:
             submitErrorMessage = error.errorDescription ?? "Could not analyze this task right now. Please try again."
         }

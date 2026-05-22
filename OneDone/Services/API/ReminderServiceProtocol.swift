@@ -12,7 +12,7 @@ enum ReminderSyncServiceError: LocalizedError {
         case .remoteSyncDisabled:
             return "Remote reminder sync is disabled."
         case .missingBaseURL:
-            return "OneDone API base URL is missing. Configure ONEDONE_API_BASE_URL to enable reminder sync."
+            return "OneDone functions base URL is missing. Configure ONEDONE_FUNCTIONS_BASE_URL to enable reminder sync."
         case let .accessDenied(message):
             return message
         case let .retryable(message):

@@ -4,6 +4,7 @@ enum AnalyzeTaskServiceError: LocalizedError {
     case remoteAnalyzeDisabled
     case missingBaseURL
     case accessDenied(message: String)
+    case rateLimited(message: String)
     case retryable(message: String)
     case invalidResponse
     case missingTaskID
@@ -14,8 +15,10 @@ enum AnalyzeTaskServiceError: LocalizedError {
         case .remoteAnalyzeDisabled:
             return "Remote task analysis is disabled."
         case .missingBaseURL:
-            return "OneDone API base URL is missing. Configure ONEDONE_API_BASE_URL to enable remote task analysis."
+            return "OneDone functions base URL is missing. Configure ONEDONE_FUNCTIONS_BASE_URL to enable remote task analysis."
         case let .accessDenied(message):
+            return message
+        case let .rateLimited(message):
             return message
         case let .retryable(message):
             return message
@@ -43,7 +46,7 @@ enum TaskActionServiceError: LocalizedError {
         case .remoteActionsDisabled:
             return "Remote task actions are disabled."
         case .missingBaseURL:
-            return "OneDone API base URL is missing. Configure ONEDONE_API_BASE_URL to enable remote task actions."
+            return "OneDone functions base URL is missing. Configure ONEDONE_FUNCTIONS_BASE_URL to enable remote task actions."
         case .missingBackendTaskID:
             return "This task is local-only and cannot be synced to backend yet."
         case let .accessDenied(message):

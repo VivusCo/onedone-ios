@@ -6,6 +6,8 @@ struct OnboardingView: View {
     let currentStep: Int
     let totalSteps: Int
     let canGoBack: Bool
+    let isSubmitting: Bool
+    let submitErrorMessage: String?
     let onBack: () -> Void
     let onNext: () -> Void
 
@@ -40,14 +42,38 @@ struct OnboardingView: View {
 
             HStack(spacing: OneDoneStyle.contentSpacing) {
                 if canGoBack {
-                    ODSecondaryButton(title: "Back", icon: "chevron.left", fullWidth: false) {
+                    ODSecondaryButton(title: "Back", icon: "chevron.left", isDisabled: isSubmitting, fullWidth: false) {
                         onBack()
                     }
                 }
 
-                ODPrimaryButton(title: "Next", icon: "arrow.right.circle.fill") {
+                ODPrimaryButton(
+                    title: isSubmitting ? "Finishing..." : "Next",
+                    icon: "arrow.right.circle.fill",
+                    isDisabled: isSubmitting
+                ) {
                     onNext()
                 }
+            }
+
+            if isSubmitting {
+                HStack(spacing: OneDoneStyle.tightSpacing) {
+                    ProgressView()
+                        .tint(ODColor.primary)
+                    Text("Completing onboarding...")
+                        .font(OneDoneStyle.subheadlineFont)
+                        .foregroundStyle(ODColor.textSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if let submitErrorMessage {
+                ODInfoBanner(
+                    title: "Could not continue",
+                    message: submitErrorMessage,
+                    icon: "exclamationmark.triangle.fill",
+                    tone: .warning
+                )
             }
 
             Spacer()
@@ -64,6 +90,8 @@ struct OnboardingView: View {
         currentStep: 0,
         totalSteps: 3,
         canGoBack: false,
+        isSubmitting: false,
+        submitErrorMessage: nil,
         onBack: {},
         onNext: {}
     )

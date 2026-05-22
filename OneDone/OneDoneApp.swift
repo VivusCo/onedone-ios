@@ -7,16 +7,21 @@ struct OneDoneApp: App {
     private static func makeInitialAppState() -> AppState {
         let environment = APIEnvironment.current
 
-        if environment.useRemoteAccessState {
-            return AppState(
-                services: .remoteAccessState(
-                    environment: environment,
-                    tokenProvider: EnvironmentAuthTokenProvider()
-                )
-            )
+        if environment.forceMockRuntime {
+            return AppState(services: .mock)
         }
 
-        return AppState(services: .mock)
+        let sessionStore = AuthSessionStore()
+        let tokenProvider = SessionAuthTokenProvider(sessionStore: sessionStore)
+
+        return AppState(
+            services: .remoteAccessState(
+                environment: environment,
+                tokenProvider: tokenProvider
+            ),
+            authService: SupabaseAuthService(environment: environment),
+            authSessionStore: sessionStore
+        )
     }
 
     var body: some Scene {

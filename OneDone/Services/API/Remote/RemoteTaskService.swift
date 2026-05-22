@@ -67,6 +67,11 @@ struct RemoteTaskService: TaskServiceProtocol {
                 throw AnalyzeTaskServiceError.accessDenied(message: message)
             }
 
+            if isRateLimitedStatus(statusCode) {
+                let message = payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
+                throw AnalyzeTaskServiceError.rateLimited(message: message)
+            }
+
             if isRetryableStatus(statusCode) {
                 let message = payloadMessage(payload) ?? "Could not analyze this task right now. Please try again."
                 throw AnalyzeTaskServiceError.retryable(message: message)
@@ -121,6 +126,12 @@ struct RemoteTaskService: TaskServiceProtocol {
         if case .retryableError = payload.responseType {
             throw TaskActionServiceError.retryable(
                 message: payloadMessage(payload) ?? "Could not complete this clarification right now."
+            )
+        }
+
+        if case .rateLimited = payload.responseType {
+            throw TaskActionServiceError.retryable(
+                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
             )
         }
 
@@ -313,6 +324,18 @@ struct RemoteTaskService: TaskServiceProtocol {
             )
         }
 
+        if case .rateLimited = payload.responseType {
+            throw AnalyzeTaskServiceError.rateLimited(
+                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
+            )
+        }
+
+        if payload.error?.code == "rate_limited" {
+            throw AnalyzeTaskServiceError.rateLimited(
+                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
+            )
+        }
+
         guard let taskID = payload.taskID, !taskID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AnalyzeTaskServiceError.missingTaskID
         }
@@ -359,7 +382,7 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw AnalyzeTaskServiceError.unsupportedResponse(
                 message: payloadMessage(payload) ?? "Received an unsupported task analysis response."
             )
-        case .retryableError, .accessError, .paywallError:
+        case .retryableError, .rateLimited, .accessError, .paywallError:
             // Handled above.
             throw AnalyzeTaskServiceError.invalidResponse
         }
@@ -378,7 +401,11 @@ struct RemoteTaskService: TaskServiceProtocol {
     }
 
     private func isRetryableStatus(_ statusCode: Int) -> Bool {
-        statusCode == 408 || statusCode == 409 || statusCode == 425 || statusCode == 429 || statusCode >= 500
+        statusCode == 408 || statusCode == 409 || statusCode == 425 || statusCode >= 500
+    }
+
+    private func isRateLimitedStatus(_ statusCode: Int) -> Bool {
+        statusCode == 429
     }
 
     private func friendlyNetworkMessage(_ error: URLError) -> String {
