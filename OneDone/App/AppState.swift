@@ -115,9 +115,14 @@ final class AppState {
     var remindersEnabled: Bool = true
     var hapticsEnabled: Bool = true
     var calmModeEnabled: Bool = true
+    let services: AppServiceContainer
 
     var templates: [TaskTemplate] = MockRepository.templates
     var tasks: [MockTask] = MockRepository.seedTasks
+
+    init(services: AppServiceContainer = .mock) {
+        self.services = services
+    }
 
     var currentOnboardingPage: OnboardingPage {
         onboardingPages[onboardingPageIndex]
@@ -257,19 +262,19 @@ final class AppState {
     }
 
     func makeDraft(prompt: String, template: TaskTemplate?) -> TaskDraft {
-        MockRepository.makeDraft(prompt: prompt, template: template)
+        services.taskService.analyzeTask(prompt: prompt, template: template)
     }
 
     func applyClarification(answer: String, to draft: TaskDraft) -> TaskDraft {
-        MockRepository.applyClarification(answer: answer, to: draft)
+        services.taskService.answerClarification(answer: answer, draft: draft)
     }
 
     func finalizeTask(from draft: TaskDraft, status: TaskStatus = .ready) -> MockTask {
-        MockRepository.makeTask(from: draft, status: status)
+        services.taskService.createTask(from: draft, status: status)
     }
 
     func makeNeedsClarificationTask(from draft: TaskDraft) -> MockTask {
-        MockRepository.makeTask(from: draft, status: .needsClarification)
+        services.taskService.createTask(from: draft, status: .needsClarification)
     }
 
     func saveTask(_ task: MockTask) {
@@ -322,7 +327,7 @@ final class AppState {
         }
 
         let safeDate = max(date, Date().addingTimeInterval(60))
-        let scheduleResult = await LocalNotificationScheduler.shared.scheduleReminder(
+        let scheduleResult = await services.reminderService.scheduleReminder(
             taskTitle: existingTask.title,
             date: safeDate
         )
@@ -330,7 +335,7 @@ final class AppState {
         switch scheduleResult {
         case let .scheduled(identifier):
             if let previousID = existingTask.reminderNotificationID {
-                LocalNotificationScheduler.shared.cancelReminder(identifier: previousID)
+                services.reminderService.cancelReminder(identifier: previousID)
             }
 
             updateTask(taskID) { task in
@@ -374,7 +379,7 @@ final class AppState {
         }
 
         if let reminderID = existingTask.reminderNotificationID {
-            LocalNotificationScheduler.shared.cancelReminder(identifier: reminderID)
+            services.reminderService.cancelReminder(identifier: reminderID)
         }
 
         updateTask(taskID) { task in
