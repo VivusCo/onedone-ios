@@ -12,6 +12,16 @@ struct NewTaskView: View {
     @State private var taskResult: MockTask?
     @State private var showTaskResult: Bool = false
     @State private var showSubscriptionGate: Bool = false
+    @State private var isSubmitting: Bool = false
+    @State private var submitErrorMessage: String?
+    @State private var splitPreviewMessage: String?
+    @State private var lastSubmission: AnalyzeSubmissionState?
+
+    private struct AnalyzeSubmissionState: Equatable {
+        let prompt: String
+        let template: TaskTemplate?
+        let idempotencyKey: String
+    }
 
     var body: some View {
         ScrollView {
@@ -63,22 +73,53 @@ struct NewTaskView: View {
                 ODPrimaryButton(
                     title: "Analyze Task",
                     icon: "arrow.right",
-                    isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
                 ) {
                     guard appState.canCreateNewTasks else {
                         showSubscriptionGate = true
                         return
                     }
 
-                    let createdDraft = appState.makeDraft(prompt: prompt, template: selectedTemplate)
-
-                    if createdDraft.requiresClarification {
-                        draft = createdDraft
-                        showClarification = true
-                    } else {
-                        taskResult = appState.finalizeTask(from: createdDraft)
-                        showTaskResult = true
+                    Task {
+                        await submitTaskAnalysis(retryLast: false)
                     }
+                }
+
+                if isSubmitting {
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ProgressView()
+                            .tint(ODColor.primary)
+                        Text("Analyzing task...")
+                            .font(OneDoneStyle.subheadlineFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                if let submitErrorMessage {
+                    ODInfoBanner(
+                        title: "Could not analyze task",
+                        message: submitErrorMessage,
+                        icon: "exclamationmark.triangle.fill",
+                        tone: .warning
+                    )
+
+                    if lastSubmission != nil {
+                        ODSecondaryButton(title: "Retry analysis", icon: "arrow.clockwise") {
+                            Task {
+                                await submitTaskAnalysis(retryLast: true)
+                            }
+                        }
+                    }
+                }
+
+                if let splitPreviewMessage {
+                    ODInfoBanner(
+                        title: "Multiple tasks detected",
+                        message: splitPreviewMessage,
+                        icon: "list.bullet.rectangle",
+                        tone: .neutral
+                    )
                 }
             }
             .padding(OneDoneStyle.screenPadding)
@@ -108,6 +149,73 @@ struct NewTaskView: View {
             if let taskResult {
                 TaskResultView(appState: appState, task: taskResult)
             }
+        }
+    }
+
+    @MainActor
+    private func submitTaskAnalysis(retryLast: Bool) async {
+        guard !isSubmitting else { return }
+        guard appState.canCreateNewTasks else {
+            showSubscriptionGate = true
+            return
+        }
+
+        let submission: AnalyzeSubmissionState
+
+        if retryLast, let lastSubmission {
+            submission = lastSubmission
+        } else {
+            let trimmedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedPrompt.isEmpty else { return }
+
+            submission = AnalyzeSubmissionState(
+                prompt: trimmedPrompt,
+                template: selectedTemplate,
+                idempotencyKey: UUID().uuidString.lowercased()
+            )
+            lastSubmission = submission
+        }
+
+        submitErrorMessage = nil
+        splitPreviewMessage = nil
+        isSubmitting = true
+
+        defer {
+            isSubmitting = false
+        }
+
+        do {
+            let analysisResult = try await appState.analyzeNewTask(
+                prompt: submission.prompt,
+                selectedTemplate: submission.template,
+                idempotencyKey: submission.idempotencyKey
+            )
+
+            switch analysisResult {
+            case let .clarification(clarificationDraft):
+                draft = clarificationDraft
+                showClarification = true
+            case let .taskAnalysis(analyzedTask):
+                taskResult = analyzedTask
+                showTaskResult = true
+            case let .splitPreview(message):
+                splitPreviewMessage = message
+            }
+        } catch let analyzeError as AnalyzeTaskServiceError {
+            handleAnalyzeError(analyzeError)
+        } catch {
+            submitErrorMessage = "Could not analyze this task right now. Please try again."
+        }
+    }
+
+    @MainActor
+    private func handleAnalyzeError(_ error: AnalyzeTaskServiceError) {
+        switch error {
+        case let .accessDenied(message):
+            submitErrorMessage = message
+            showSubscriptionGate = true
+        default:
+            submitErrorMessage = error.errorDescription ?? "Could not analyze this task right now. Please try again."
         }
     }
 }

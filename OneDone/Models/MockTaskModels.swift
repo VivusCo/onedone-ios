@@ -100,17 +100,51 @@ struct TaskTemplate: Identifiable, Hashable {
     let title: String
     let promptHint: String
     let focus: String
+    let backendTemplateID: String?
 
-    init(id: UUID = UUID(), title: String, promptHint: String, focus: String) {
+    init(
+        id: UUID = UUID(),
+        title: String,
+        promptHint: String,
+        focus: String,
+        backendTemplateID: String? = nil
+    ) {
         self.id = id
         self.title = title
         self.promptHint = promptHint
         self.focus = focus
+        self.backendTemplateID = backendTemplateID
+    }
+}
+
+extension TaskTemplate {
+    var resolvedBackendTemplateID: String? {
+        if let backendTemplateID, !backendTemplateID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return backendTemplateID
+        }
+
+        switch title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "cancel a subscription":
+            return "cancel_subscription"
+        case "return an item":
+            return "return_item"
+        case "request a refund":
+            return "request_refund"
+        case "understand a bill":
+            return "understand_bill"
+        case "write a complaint":
+            return "write_complaint"
+        case "reply to a message":
+            return "reply_to_message"
+        default:
+            return nil
+        }
     }
 }
 
 struct TaskDraft: Identifiable, Hashable {
     let id: UUID
+    var backendTaskID: String?
     var title: String
     var prompt: String
     var intent: TaskIntent
@@ -123,6 +157,7 @@ struct TaskDraft: Identifiable, Hashable {
 
     init(
         id: UUID = UUID(),
+        backendTaskID: String? = nil,
         title: String,
         prompt: String,
         intent: TaskIntent = .generic,
@@ -134,6 +169,7 @@ struct TaskDraft: Identifiable, Hashable {
         actionPlan: [String]
     ) {
         self.id = id
+        self.backendTaskID = backendTaskID
         self.title = title
         self.prompt = prompt
         self.intent = intent
@@ -148,6 +184,7 @@ struct TaskDraft: Identifiable, Hashable {
 
 struct MockTask: Identifiable, Hashable {
     let id: UUID
+    var backendTaskID: String?
     var title: String
     var category: String
     var prompt: String
@@ -167,6 +204,7 @@ struct MockTask: Identifiable, Hashable {
 
     init(
         id: UUID = UUID(),
+        backendTaskID: String? = nil,
         title: String,
         category: String = "General",
         prompt: String,
@@ -185,6 +223,7 @@ struct MockTask: Identifiable, Hashable {
         timeline: [TaskTimelineEntry] = []
     ) {
         self.id = id
+        self.backendTaskID = backendTaskID
         self.title = title
         self.category = category
         self.prompt = prompt

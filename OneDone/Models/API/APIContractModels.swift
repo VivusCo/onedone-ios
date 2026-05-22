@@ -59,7 +59,121 @@ struct GetAccessStateDTO: Decodable {
 
 struct AnalyzeTaskRequest: Codable {
     var inputText: String
-    var templateKey: String?
+    var selectedTemplate: String?
+    var deadlineAtISO8601: String?
+    var contextNotes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case inputText = "input_text"
+        case selectedTemplate = "selected_template"
+        case deadlineAtISO8601 = "deadline_at"
+        case contextNotes = "context_notes"
+    }
+}
+
+enum AnalyzeTaskResponseType: String, Codable {
+    case clarification
+    case taskAnalysis = "task_analysis"
+    case multiTaskSplitPreview = "multi_task_split_preview"
+    case retryableError = "retryable_error"
+    case accessError = "access_error"
+    case paywallError = "paywall_error"
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawValue = (try? container.decode(String.self)) ?? ""
+        self = AnalyzeTaskResponseType(rawValue: rawValue) ?? .unknown
+    }
+}
+
+struct AnalyzeTaskClarificationPayload: Decodable {
+    var question: String?
+    var helperText: String?
+    var options: [String]
+    var title: String?
+
+    enum CodingKeys: String, CodingKey {
+        case question
+        case helperText = "helper_text"
+        case options
+        case title
+    }
+}
+
+struct AnalyzeTaskAnalysisPayload: Decodable {
+    var title: String?
+    var summary: String?
+    var latestOutput: String?
+    var checklist: [String]
+    var nextSteps: [String]
+    var category: String?
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case summary
+        case latestOutput = "latest_output"
+        case checklist
+        case nextSteps = "next_steps"
+        case category
+    }
+}
+
+struct AnalyzeTaskSplitPreviewItem: Decodable {
+    var id: String?
+    var title: String
+}
+
+struct AnalyzeTaskSplitPreviewPayload: Decodable {
+    var title: String?
+    var message: String?
+    var items: [AnalyzeTaskSplitPreviewItem]
+
+    enum CodingKeys: String, CodingKey {
+        case title
+        case message
+        case items
+    }
+}
+
+struct AnalyzeTaskErrorPayload: Decodable {
+    var code: String?
+    var message: String?
+    var retryable: Bool?
+}
+
+struct AnalyzeTaskResponseDTO: Decodable {
+    var taskID: String?
+    var responseType: AnalyzeTaskResponseType
+    var clarification: AnalyzeTaskClarificationPayload?
+    var taskAnalysis: AnalyzeTaskAnalysisPayload?
+    var multiTaskSplitPreview: AnalyzeTaskSplitPreviewPayload?
+    var error: AnalyzeTaskErrorPayload?
+    var message: String?
+    var access: APIAccessStatePayload?
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case responseType = "response_type"
+        case clarification
+        case taskAnalysis = "task_analysis"
+        case multiTaskSplitPreview = "multi_task_split_preview"
+        case error
+        case message
+        case access
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        taskID = try container.decodeIfPresent(String.self, forKey: .taskID)
+        responseType = try container.decodeIfPresent(AnalyzeTaskResponseType.self, forKey: .responseType) ?? .unknown
+        clarification = try container.decodeIfPresent(AnalyzeTaskClarificationPayload.self, forKey: .clarification)
+        taskAnalysis = try container.decodeIfPresent(AnalyzeTaskAnalysisPayload.self, forKey: .taskAnalysis)
+        multiTaskSplitPreview = try container.decodeIfPresent(AnalyzeTaskSplitPreviewPayload.self, forKey: .multiTaskSplitPreview)
+        error = try container.decodeIfPresent(AnalyzeTaskErrorPayload.self, forKey: .error)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+        access = try container.decodeIfPresent(APIAccessStatePayload.self, forKey: .access)
+    }
 }
 
 struct AnalyzeTaskResponse: Codable {

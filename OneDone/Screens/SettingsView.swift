@@ -52,7 +52,7 @@ struct SettingsView: View {
         case .mock:
             return "Running in local mock mode. No Supabase, StoreKit, backend, or OpenAI calls are used."
         case .remoteAccessState:
-            return "Using backend get-access-state for access routing. Task, reply, reminder, and subscription actions remain local mock behavior."
+            return "Using backend get-access-state and analyze-task when remote mode is enabled. Clarification answers, replies, reminders, and subscription actions remain local mock behavior."
         case .remotePlaceholder:
             return "Remote placeholder mode is scaffold-only and not intended for runtime."
         }

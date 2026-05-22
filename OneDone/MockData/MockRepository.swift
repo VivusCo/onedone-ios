@@ -14,32 +14,38 @@ enum MockRepository {
         TaskTemplate(
             title: "Cancel a subscription",
             promptHint: "Help me cancel this subscription and ask for written confirmation that billing will stop.",
-            focus: "Clear cancellation steps"
+            focus: "Clear cancellation steps",
+            backendTemplateID: "cancel_subscription"
         ),
         TaskTemplate(
             title: "Return an item",
             promptHint: "Write a return request for this purchase, including order details and preferred resolution.",
-            focus: "Simple return request"
+            focus: "Simple return request",
+            backendTemplateID: "return_item"
         ),
         TaskTemplate(
             title: "Request a refund",
             promptHint: "Draft a polite refund request with clear facts and a direct ask.",
-            focus: "Calm refund message"
+            focus: "Calm refund message",
+            backendTemplateID: "request_refund"
         ),
         TaskTemplate(
             title: "Understand a bill",
             promptHint: "Paste the bill text and help me understand each charge in plain language.",
-            focus: "Paste the bill text"
+            focus: "Paste the bill text",
+            backendTemplateID: "understand_bill"
         ),
         TaskTemplate(
             title: "Write a complaint",
             promptHint: "Draft a respectful complaint that states the issue, impact, and requested fix.",
-            focus: "Firm but respectful tone"
+            focus: "Firm but respectful tone",
+            backendTemplateID: "write_complaint"
         ),
         TaskTemplate(
             title: "Reply to a message",
             promptHint: "Paste the message text and draft a concise reply with one clear next step.",
-            focus: "Clear next step"
+            focus: "Clear next step",
+            backendTemplateID: "reply_to_message"
         )
     ]
 
@@ -422,6 +428,7 @@ enum MockRepository {
         let replyDraft = status == .needsClarification ? nil : draft.generatedReply
 
         return MockTask(
+            backendTaskID: draft.backendTaskID,
             title: draft.title.isEmpty ? "New task" : draft.title,
             category: category,
             prompt: draft.prompt,
