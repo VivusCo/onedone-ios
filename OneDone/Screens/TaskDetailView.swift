@@ -27,12 +27,21 @@ struct TaskDetailView: View {
                 )
 
                 if let remoteDetailErrorMessage {
-                    ODInfoBanner(
-                        title: "Could not load task detail",
-                        message: remoteDetailErrorMessage,
-                        icon: "exclamationmark.triangle.fill",
-                        tone: .warning
-                    )
+                    if appState.shouldUseRemoteTaskActions && task != nil {
+                        ODInfoBanner(
+                            title: "Showing last saved data",
+                            message: "Showing last saved data. Pull to refresh.",
+                            icon: "arrow.triangle.2.circlepath",
+                            tone: .neutral
+                        )
+                    } else {
+                        ODInfoBanner(
+                            title: "Could not load task detail",
+                            message: remoteDetailErrorMessage,
+                            icon: "exclamationmark.triangle.fill",
+                            tone: .warning
+                        )
+                    }
 
                     ODSecondaryButton(title: "Retry", icon: "arrow.clockwise") {
                         Task {
