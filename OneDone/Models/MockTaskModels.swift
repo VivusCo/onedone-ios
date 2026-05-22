@@ -81,6 +81,8 @@ enum TaskStatus: String, CaseIterable, Identifiable, Hashable {
             return .new
         case "follow_up_needed":
             return .followUpNeeded
+        case "waiting_for_user":
+            return .followUpNeeded
         case "due_soon":
             return .dueSoon
         case "needs_clarification":
@@ -94,6 +96,8 @@ enum TaskStatus: String, CaseIterable, Identifiable, Hashable {
         case "ready":
             return .ready
         case "done":
+            return .done
+        case "completed":
             return .done
         case "draft":
             return .draft

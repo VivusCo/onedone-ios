@@ -213,9 +213,33 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw TaskActionServiceError.remoteActionsDisabled
         }
 
-        struct EmptyBody: Codable {}
-        let data = try await postEdgeFunction(path: "functions/v1/list-tasks", body: EmptyBody(), idempotencyKey: nil)
-        return decodeArrayWrapper(data, as: BackendTaskSummaryDTO.self) ?? []
+        let data = try await getEdgeFunction(
+            endpoint: "list-tasks",
+            queryItems: []
+        )
+
+        if let direct = decodeArrayWrapper(data, as: BackendTaskSummaryDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeArrayByKeys(data, keys: ["tasks", "items", "data", "task_list"], as: BackendTaskSummaryDTO.self) {
+            return keyed
+        }
+
+        if let single = decodeSingleWrapper(data, as: BackendTaskSummaryDTO.self) {
+            return [single]
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return []
+        }
+
+        if let embeddedError = classifyReadPayloadError(data) {
+            throw embeddedError
+        }
+
+        logReadDecodeFailure(endpoint: "list-tasks", data: data)
+        throw TaskActionServiceError.invalidResponse
     }
 
     func fetchTaskDetail(taskID: String) async throws -> BackendTaskDetailDTO? {
@@ -223,20 +247,29 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw TaskActionServiceError.remoteActionsDisabled
         }
 
-        struct RequestBody: Codable {
-            let taskID: String
-            enum CodingKeys: String, CodingKey {
-                case taskID = "task_id"
-            }
-        }
-
-        let data = try await postEdgeFunction(
-            path: "functions/v1/get-task-detail",
-            body: RequestBody(taskID: taskID),
-            idempotencyKey: nil
+        let data = try await getEdgeFunction(
+            endpoint: "get-task-detail",
+            queryItems: [URLQueryItem(name: "task_id", value: taskID)]
         )
 
-        return decodeSingleWrapper(data, as: BackendTaskDetailDTO.self)
+        if let direct = decodeSingleWrapper(data, as: BackendTaskDetailDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeSingleByKeys(data, keys: ["task", "detail", "item", "data"], as: BackendTaskDetailDTO.self) {
+            return keyed
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return nil
+        }
+
+        if let embeddedError = classifyReadPayloadError(data) {
+            throw embeddedError
+        }
+
+        logReadDecodeFailure(endpoint: "get-task-detail", data: data)
+        throw TaskActionServiceError.invalidResponse
     }
 
     func fetchTaskOutputs(taskID: String) async throws -> [BackendTaskOutputDTO] {
@@ -244,20 +277,29 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw TaskActionServiceError.remoteActionsDisabled
         }
 
-        struct RequestBody: Codable {
-            let taskID: String
-            enum CodingKeys: String, CodingKey {
-                case taskID = "task_id"
-            }
-        }
-
-        let data = try await postEdgeFunction(
-            path: "functions/v1/get-task-outputs",
-            body: RequestBody(taskID: taskID),
-            idempotencyKey: nil
+        let data = try await getEdgeFunction(
+            endpoint: "get-task-outputs",
+            queryItems: [URLQueryItem(name: "task_id", value: taskID)]
         )
 
-        return decodeArrayWrapper(data, as: BackendTaskOutputDTO.self) ?? []
+        if let direct = decodeArrayWrapper(data, as: BackendTaskOutputDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeArrayByKeys(data, keys: ["outputs", "items", "data"], as: BackendTaskOutputDTO.self) {
+            return keyed
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return []
+        }
+
+        if let embeddedError = classifyReadPayloadError(data) {
+            throw embeddedError
+        }
+
+        logReadDecodeFailure(endpoint: "get-task-outputs", data: data)
+        throw TaskActionServiceError.invalidResponse
     }
 
     func fetchTaskEvents(taskID: String) async throws -> [BackendTaskEventDTO] {
@@ -265,20 +307,29 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw TaskActionServiceError.remoteActionsDisabled
         }
 
-        struct RequestBody: Codable {
-            let taskID: String
-            enum CodingKeys: String, CodingKey {
-                case taskID = "task_id"
-            }
-        }
-
-        let data = try await postEdgeFunction(
-            path: "functions/v1/get-task-events",
-            body: RequestBody(taskID: taskID),
-            idempotencyKey: nil
+        let data = try await getEdgeFunction(
+            endpoint: "get-task-events",
+            queryItems: [URLQueryItem(name: "task_id", value: taskID)]
         )
 
-        return decodeArrayWrapper(data, as: BackendTaskEventDTO.self) ?? []
+        if let direct = decodeArrayWrapper(data, as: BackendTaskEventDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeArrayByKeys(data, keys: ["events", "items", "data"], as: BackendTaskEventDTO.self) {
+            return keyed
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return []
+        }
+
+        if let embeddedError = classifyReadPayloadError(data) {
+            throw embeddedError
+        }
+
+        logReadDecodeFailure(endpoint: "get-task-events", data: data)
+        throw TaskActionServiceError.invalidResponse
     }
 
     func fetchChecklistItems(taskID: String) async throws -> [BackendChecklistItemDTO] {
@@ -286,20 +337,29 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw TaskActionServiceError.remoteActionsDisabled
         }
 
-        struct RequestBody: Codable {
-            let taskID: String
-            enum CodingKeys: String, CodingKey {
-                case taskID = "task_id"
-            }
-        }
-
-        let data = try await postEdgeFunction(
-            path: "functions/v1/get-checklist-items",
-            body: RequestBody(taskID: taskID),
-            idempotencyKey: nil
+        let data = try await getEdgeFunction(
+            endpoint: "get-checklist-items",
+            queryItems: [URLQueryItem(name: "task_id", value: taskID)]
         )
 
-        return decodeArrayWrapper(data, as: BackendChecklistItemDTO.self) ?? []
+        if let direct = decodeArrayWrapper(data, as: BackendChecklistItemDTO.self) {
+            return direct
+        }
+
+        if let keyed = decodeArrayByKeys(data, keys: ["checklist_items", "items", "data"], as: BackendChecklistItemDTO.self) {
+            return keyed
+        }
+
+        if isEmptyCollectionPayload(data) {
+            return []
+        }
+
+        if let embeddedError = classifyReadPayloadError(data) {
+            throw embeddedError
+        }
+
+        logReadDecodeFailure(endpoint: "get-checklist-items", data: data)
+        throw TaskActionServiceError.invalidResponse
     }
 
     func processIncomingReply(_ request: ProcessIncomingReplyRequest) throws -> ProcessIncomingReplyResponse {
@@ -421,6 +481,100 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
     }
 
+    private func friendlyReadNetworkMessage(_ error: URLError) -> String {
+        switch error.code {
+        case .notConnectedToInternet:
+            return "You appear to be offline. Connect to the internet and refresh."
+        case .timedOut:
+            return "Task data request timed out. Pull to refresh and try again."
+        default:
+            return "Network issue while loading task data. Please try again."
+        }
+    }
+
+    private func getEdgeFunction(
+        endpoint: String,
+        queryItems: [URLQueryItem]
+    ) async throws -> Data {
+        guard let url = edgeFunctionURL(endpoint: endpoint, queryItems: queryItems) else {
+            throw TaskActionServiceError.missingBaseURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        if let token = tokenProvider.accessToken() {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        do {
+            let (data, response) = try await urlSession.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw TaskActionServiceError.invalidResponse
+            }
+
+            if isAccessStatus(httpResponse.statusCode) {
+                logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
+                let message = decodeErrorMessage(data) ?? "Your current access does not allow loading this task data."
+                throw TaskActionServiceError.accessDenied(message: message)
+            }
+
+            if isRateLimitedStatus(httpResponse.statusCode) || isRetryableStatus(httpResponse.statusCode) {
+                logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
+                let message = decodeErrorMessage(data) ?? "Task data is temporarily unavailable. Please try again."
+                throw TaskActionServiceError.retryable(message: message)
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
+                let message = decodeErrorMessage(data) ?? "Task data request failed."
+                throw TaskActionServiceError.retryable(message: message)
+            }
+
+            return data
+        } catch let error as TaskActionServiceError {
+            throw error
+        } catch let error as URLError {
+            throw TaskActionServiceError.retryable(message: friendlyReadNetworkMessage(error))
+        } catch {
+            throw TaskActionServiceError.retryable(message: "Task data request failed. Please try again.")
+        }
+    }
+
+    private func edgeFunctionURL(endpoint: String, queryItems: [URLQueryItem]) -> URL? {
+        guard let baseURL = environment.baseURL else { return nil }
+
+        let cleanedEndpoint = sanitizeEndpoint(endpoint)
+        let basePath = baseURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased()
+
+        let functionBaseURL: URL
+        if basePath.hasSuffix("functions/v1") {
+            functionBaseURL = baseURL
+        } else {
+            functionBaseURL = baseURL
+                .appendingPathComponent("functions")
+                .appendingPathComponent("v1")
+        }
+
+        var components = URLComponents(url: functionBaseURL.appendingPathComponent(cleanedEndpoint), resolvingAgainstBaseURL: false)
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+        return components?.url
+    }
+
+    private func sanitizeEndpoint(_ endpoint: String) -> String {
+        var cleaned = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
+        while cleaned.hasPrefix("/") {
+            cleaned.removeFirst()
+        }
+        if cleaned.lowercased().hasPrefix("functions/v1/") {
+            cleaned.removeFirst("functions/v1/".count)
+        }
+        return cleaned
+    }
+
     private func postEdgeFunction<T: Codable>(
         path: String,
         body: T,
@@ -477,15 +631,104 @@ struct RemoteTaskService: TaskServiceProtocol {
     }
 
     private func decodeErrorMessage(_ data: Data) -> String? {
-        struct ErrorPayload: Decodable {
+        struct NestedErrorPayload: Decodable {
+            struct NestedError: Decodable {
+                let code: String?
+                let message: String?
+                let retryable: Bool?
+            }
+
+            let ok: Bool?
+            let error: NestedError?
             let message: String?
-            let error: String?
         }
 
-        if let payload = try? JSONDecoder().decode(ErrorPayload.self, from: data) {
-            return payload.message ?? payload.error
+        struct FlatErrorPayload: Decodable {
+            let message: String?
+            let error: String?
+            let errorMessage: String?
+            let detail: String?
+
+            enum CodingKeys: String, CodingKey {
+                case message
+                case error
+                case errorMessage = "error_message"
+                case detail
+            }
+        }
+
+        if let payload = try? JSONDecoder().decode(NestedErrorPayload.self, from: data),
+           let nestedMessage = payload.error?.message,
+           !nestedMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nestedMessage
+        }
+
+        if let payload = try? JSONDecoder().decode(FlatErrorPayload.self, from: data) {
+            return payload.message ?? payload.errorMessage ?? payload.detail ?? payload.error
         }
         return nil
+    }
+
+    private func classifyReadPayloadError(_ data: Data) -> TaskActionServiceError? {
+        struct PayloadEnvelope: Decodable {
+            struct PayloadError: Decodable {
+                let code: String?
+                let message: String?
+                let retryable: Bool?
+            }
+
+            let ok: Bool?
+            let message: String?
+            let error: PayloadError?
+            let errorCode: String?
+            let errorMessage: String?
+            let detail: String?
+
+            enum CodingKeys: String, CodingKey {
+                case ok
+                case message
+                case error
+                case errorCode = "error_code"
+                case errorMessage = "error_message"
+                case detail
+            }
+        }
+
+        guard let envelope = try? JSONDecoder().decode(PayloadEnvelope.self, from: data) else {
+            return nil
+        }
+
+        let hasErrorSignal = envelope.ok == false ||
+            envelope.error != nil ||
+            envelope.errorCode != nil ||
+            envelope.errorMessage != nil
+        guard hasErrorSignal else { return nil }
+
+        let code = normalizedCode(envelope.error?.code ?? envelope.errorCode)
+        let message = sanitizeBackendMessage(
+            envelope.error?.message ??
+            envelope.errorMessage ??
+            envelope.message ??
+            envelope.detail
+        ) ?? "Task data request failed."
+        let normalizedMessage = message.lowercased()
+
+        if isAccessLikeError(code: code, message: normalizedMessage) ||
+            isAuthLikeError(code: code, message: normalizedMessage) {
+            return .accessDenied(message: message)
+        }
+
+        if code == "rate_limited" ||
+            normalizedMessage.contains("rate limit") ||
+            normalizedMessage.contains("too many requests") {
+            return .retryable(message: message)
+        }
+
+        if envelope.error?.retryable == true || isRetryableLikeError(code: code, message: normalizedMessage) {
+            return .retryable(message: message)
+        }
+
+        return .retryable(message: message)
     }
 
     private func decodeSingleWrapper<T: Decodable>(_ data: Data, as type: T.Type) -> T? {
@@ -510,6 +753,89 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         return nil
+    }
+
+    private func decodeSingleByKeys<T: Decodable>(_ data: Data, keys: [String], as type: T.Type) -> T? {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return nil
+        }
+
+        for key in keys {
+            guard let nested = dictionary[key],
+                  JSONSerialization.isValidJSONObject(nested),
+                  let nestedData = try? JSONSerialization.data(withJSONObject: nested) else {
+                continue
+            }
+
+            if let decoded = decodeSingleWrapper(nestedData, as: type) {
+                return decoded
+            }
+        }
+
+        return nil
+    }
+
+    private func decodeArrayByKeys<T: Decodable>(_ data: Data, keys: [String], as type: T.Type) -> [T]? {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return nil
+        }
+
+        for key in keys {
+            guard let nested = dictionary[key],
+                  JSONSerialization.isValidJSONObject(nested),
+                  let nestedData = try? JSONSerialization.data(withJSONObject: nested) else {
+                continue
+            }
+
+            if let decoded = decodeArrayWrapper(nestedData, as: type) {
+                return decoded
+            }
+        }
+
+        return nil
+    }
+
+    private func isEmptyCollectionPayload(_ data: Data) -> Bool {
+        guard let object = try? JSONSerialization.jsonObject(with: data) else {
+            return false
+        }
+
+        if let array = object as? [Any] {
+            return array.isEmpty
+        }
+
+        if let dictionary = object as? [String: Any] {
+            if dictionary.isEmpty {
+                return true
+            }
+
+            let emptyKeys = ["data", "result", "response", "payload", "tasks", "items", "outputs", "events", "checklist_items", "reminders"]
+            for key in emptyKeys {
+                if let value = dictionary[key] as? [Any], value.isEmpty {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+    private func logReadHTTPFailure(endpoint: String, statusCode: Int, data: Data) {
+#if DEBUG
+        let keys = topLevelJSONKeys(from: data)
+        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) status=\(statusCode) keys=\(keysDescription)")
+#endif
+    }
+
+    private func logReadDecodeFailure(endpoint: String, data: Data) {
+#if DEBUG
+        let keys = topLevelJSONKeys(from: data)
+        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
+        print("[OneDone][RemoteReadDecode] endpoint=\(endpoint) keys=\(keysDescription)")
+#endif
     }
 
     private func classifyAnalyzePayloadError(_ payload: AnalyzeTaskResponseDTO) -> AnalyzeTaskServiceError? {

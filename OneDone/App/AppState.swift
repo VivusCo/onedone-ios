@@ -162,6 +162,7 @@ final class AppState {
     private var didAttemptRemoteAccessBootstrap: Bool = false
     private var isRefreshingRemoteAccessState: Bool = false
     private var forceMockTaskFlowInSession: Bool = false
+    private var backendTaskIDToLocalID: [String: UUID] = [:]
 
     var templates: [TaskTemplate] = MockRepository.templates
     var tasks: [MockTask]
@@ -174,7 +175,17 @@ final class AppState {
         self.services = services
         self.authService = authService
         self.authSessionStore = authSessionStore
-        self.tasks = services.runtimeMode == .mock ? MockRepository.seedTasks : []
+        let initialTasks = services.runtimeMode == .mock ? MockRepository.seedTasks : []
+        self.tasks = initialTasks
+        self.backendTaskIDToLocalID = Dictionary(
+            uniqueKeysWithValues: initialTasks.compactMap { task in
+                guard let backendTaskID = task.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !backendTaskID.isEmpty else {
+                    return nil
+                }
+                return (backendTaskID, task.id)
+            }
+        )
         self.phase = services.runtimeMode == .remoteAccessState ? .accessStateLoading : .welcome
     }
 
@@ -364,6 +375,15 @@ final class AppState {
         authInfoMessage = "Development-only fallback is active."
         if tasks.isEmpty {
             tasks = MockRepository.seedTasks
+            backendTaskIDToLocalID = Dictionary(
+                uniqueKeysWithValues: tasks.compactMap { task in
+                    guard let backendTaskID = task.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !backendTaskID.isEmpty else {
+                        return nil
+                    }
+                    return (backendTaskID, task.id)
+                }
+            )
         }
         phase = .welcome
 #endif
@@ -727,10 +747,68 @@ final class AppState {
         }
 
         tasks.insert(task, at: 0)
+
+        if let normalizedBackendTaskID = normalizeBackendTaskID(task.backendTaskID) {
+            backendTaskIDToLocalID[normalizedBackendTaskID] = task.id
+        }
     }
 
     func task(for id: UUID) -> MockTask? {
         tasks.first(where: { $0.id == id })
+    }
+
+    @MainActor
+    func refreshTasksFromRemote() async -> String? {
+        guard shouldUseRemoteTaskActions else { return nil }
+
+        do {
+            try await ensureValidSessionForRemoteUse()
+            let summaries = try await services.taskService.fetchTaskList()
+            applyRemoteTaskSummaries(summaries)
+            return nil
+        } catch {
+            return friendlyTaskListLoadError(error)
+        }
+    }
+
+    @MainActor
+    func refreshTaskDetailFromRemote(taskID: UUID) async -> String? {
+        guard shouldUseRemoteTaskActions else { return nil }
+
+        guard let existingTask = task(for: taskID) else {
+            return "Task not found."
+        }
+
+        guard let backendTaskID = normalizeBackendTaskID(existingTask.backendTaskID) else {
+            return "This task is local-only and cannot load backend details yet."
+        }
+
+        do {
+            try await ensureValidSessionForRemoteUse()
+
+            async let detail = services.taskService.fetchTaskDetail(taskID: backendTaskID)
+            async let outputs = services.taskService.fetchTaskOutputs(taskID: backendTaskID)
+            async let events = services.taskService.fetchTaskEvents(taskID: backendTaskID)
+            async let checklist = services.taskService.fetchChecklistItems(taskID: backendTaskID)
+
+            let reminders = (try? await services.reminderService.fetchReminders(taskID: backendTaskID)) ?? []
+            let detailPayload = try await detail
+            let outputsPayload = try await outputs
+            let eventsPayload = try await events
+            let checklistPayload = try await checklist
+
+            applyRemoteTaskDetail(
+                toTaskID: taskID,
+                detail: detailPayload,
+                outputs: outputsPayload,
+                events: eventsPayload,
+                checklist: checklistPayload,
+                reminders: reminders
+            )
+            return nil
+        } catch {
+            return friendlyTaskDetailLoadError(error)
+        }
     }
 
     func markTaskWaitingForReply(_ taskID: UUID, sentMessage: String) {
@@ -1012,6 +1090,7 @@ final class AppState {
                 authenticatedUserEmail = session.userEmail ?? email
                 authInfoMessage = nil
                 tasks.removeAll()
+                backendTaskIDToLocalID.removeAll()
                 selectedTab = .home
                 await refreshAccessStateFromRemote()
             case let .requiresEmailConfirmation(pendingEmail):
@@ -1035,6 +1114,7 @@ final class AppState {
             try authSessionStore.persistSession(session)
             authenticatedUserEmail = session.userEmail ?? email
             tasks.removeAll()
+            backendTaskIDToLocalID.removeAll()
             selectedTab = .home
             await refreshAccessStateFromRemote()
         } catch {
@@ -1066,8 +1146,18 @@ final class AppState {
 
         if services.runtimeMode == .mock {
             tasks = MockRepository.seedTasks
+            backendTaskIDToLocalID = Dictionary(
+                uniqueKeysWithValues: tasks.compactMap { task in
+                    guard let backendTaskID = task.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines),
+                          !backendTaskID.isEmpty else {
+                        return nil
+                    }
+                    return (backendTaskID, task.id)
+                }
+            )
         } else {
             tasks = []
+            backendTaskIDToLocalID.removeAll()
         }
     }
 
@@ -1268,6 +1358,323 @@ final class AppState {
         }
 
         return "Please try again."
+    }
+
+    private func friendlyTaskListLoadError(_ error: Error) -> String {
+        switch error {
+        case is SupabaseAuthServiceError:
+            return "Your session may have expired. Please log in again."
+        case let taskError as TaskActionServiceError:
+            switch taskError {
+            case .accessDenied:
+                return "You do not currently have permission to load tasks."
+            case .missingBaseURL, .invalidResponse, .unsupportedResponse:
+                return "Task list is temporarily unavailable. Please try again."
+            case .retryable:
+                return "Could not load tasks right now. Pull to refresh and try again."
+            case .remoteActionsDisabled:
+                return "Remote task loading is disabled in this mode."
+            case .missingBackendTaskID:
+                return "A task sync identifier is missing."
+            }
+        default:
+            return "Could not load tasks right now. Pull to refresh and try again."
+        }
+    }
+
+    private func friendlyTaskDetailLoadError(_ error: Error) -> String {
+        switch error {
+        case is SupabaseAuthServiceError:
+            return "Your session may have expired. Please log in again."
+        case let taskError as TaskActionServiceError:
+            switch taskError {
+            case .accessDenied:
+                return "You do not currently have permission to view this task."
+            case .missingBaseURL, .invalidResponse, .unsupportedResponse:
+                return "Task details are temporarily unavailable. Please try again."
+            case .retryable:
+                return "Could not load task details right now. Pull to refresh and try again."
+            case .remoteActionsDisabled:
+                return "Remote task loading is disabled in this mode."
+            case .missingBackendTaskID:
+                return "This task is local-only and not linked to backend yet."
+            }
+        default:
+            return "Could not load task details right now. Pull to refresh and try again."
+        }
+    }
+
+    private func applyRemoteTaskSummaries(_ summaries: [BackendTaskSummaryDTO]) {
+        let existingByBackendID: [String: MockTask] = Dictionary(
+            uniqueKeysWithValues: tasks.compactMap { task in
+                guard let backendTaskID = normalizeBackendTaskID(task.backendTaskID) else {
+                    return nil
+                }
+                return (backendTaskID, task)
+            }
+        )
+
+        var mappedTasks: [MockTask] = []
+        mappedTasks.reserveCapacity(summaries.count)
+
+        for summary in summaries {
+            guard let normalizedBackendTaskID = normalizeBackendTaskID(summary.taskID) else { continue }
+            let existingTask = existingByBackendID[normalizedBackendTaskID]
+            mappedTasks.append(mapTaskSummary(summary, normalizedBackendTaskID: normalizedBackendTaskID, existingTask: existingTask))
+        }
+
+        tasks = mappedTasks
+        rebuildBackendTaskIDToLocalIDMap()
+    }
+
+    private func mapTaskSummary(
+        _ summary: BackendTaskSummaryDTO,
+        normalizedBackendTaskID: String,
+        existingTask: MockTask?
+    ) -> MockTask {
+        let localID = localTaskID(forBackendTaskID: normalizedBackendTaskID, existingID: existingTask?.id)
+        let mappedStatus = TaskStatus.fromBackend(summary.status ?? existingTask?.status.backendValue)
+        let mappedCreatedAt = parseISO8601Date(summary.createdAtISO8601) ?? existingTask?.createdAt ?? Date()
+        let mappedDueDate = parseISO8601Date(summary.dueAtISO8601) ?? existingTask?.dueDate
+        let mappedReminderDate = parseISO8601Date(summary.reminderAtISO8601) ?? existingTask?.reminderDate
+
+        let mappedTitle = firstNonEmpty(summary.title, existingTask?.title, "Task")
+        let mappedCategory = firstNonEmpty(summary.category, existingTask?.category, "General")
+        let mappedPrompt = firstNonEmpty(summary.title, existingTask?.prompt, "Open task detail for context.")
+        let mappedNextStep = firstNonEmpty(
+            summary.currentNextStep,
+            existingTask?.currentNextStep,
+            "Open task detail and continue with the next step."
+        )
+        let mappedLastEvent = firstNonEmpty(summary.lastEventPreview, existingTask?.lastEventPreview, "Task synced from backend.")
+
+        return MockTask(
+            id: localID,
+            backendTaskID: normalizedBackendTaskID,
+            backendReminderID: existingTask?.backendReminderID,
+            title: mappedTitle,
+            category: mappedCategory,
+            prompt: mappedPrompt,
+            clarification: existingTask?.clarification ?? "",
+            generatedReply: existingTask?.generatedReply ?? "Open task detail to view the latest output.",
+            actionPlan: existingTask?.actionPlan ?? [],
+            createdAt: mappedCreatedAt,
+            dueDate: mappedDueDate,
+            status: mappedStatus,
+            latestAIOutput: existingTask?.latestAIOutput ?? summary.lastEventPreview ?? "Open task detail for latest AI output.",
+            replyDraft: existingTask?.replyDraft,
+            currentNextStep: mappedNextStep,
+            lastEventPreview: mappedLastEvent,
+            reminderDate: mappedReminderDate,
+            reminderNotificationID: existingTask?.reminderNotificationID,
+            timeline: existingTask?.timeline ?? []
+        )
+    }
+
+    private func applyRemoteTaskDetail(
+        toTaskID taskID: UUID,
+        detail: BackendTaskDetailDTO?,
+        outputs: [BackendTaskOutputDTO],
+        events: [BackendTaskEventDTO],
+        checklist: [BackendChecklistItemDTO],
+        reminders: [BackendReminderDTO]
+    ) {
+        updateTask(taskID) { task in
+            task.title = firstNonEmpty(detail?.title, task.title)
+            task.category = firstNonEmpty(detail?.category, task.category)
+            task.prompt = firstNonEmpty(detail?.prompt, task.prompt)
+            task.status = TaskStatus.fromBackend(detail?.status ?? task.status.backendValue)
+
+            if let backendTaskID = normalizeBackendTaskID(detail?.taskID) {
+                task.backendTaskID = backendTaskID
+            }
+
+            if let createdAt = parseISO8601Date(detail?.createdAtISO8601) {
+                task.createdAt = createdAt
+            }
+
+            if let dueDate = parseISO8601Date(detail?.dueAtISO8601) {
+                task.dueDate = dueDate
+            }
+
+            if let reminderDate = parseISO8601Date(detail?.reminderAtISO8601) {
+                task.reminderDate = reminderDate
+            }
+
+            if let clarification = normalizedNonEmptyString(detail?.clarification) {
+                task.clarification = clarification
+            }
+
+            let mappedChecklist = checklist
+                .compactMap { normalizedNonEmptyString($0.text) }
+
+            if !mappedChecklist.isEmpty {
+                task.actionPlan = mappedChecklist
+            }
+
+            task.currentNextStep = firstNonEmpty(
+                detail?.currentNextStep,
+                mappedChecklist.first,
+                task.currentNextStep
+            )
+
+            let newestOutput = newestBackendOutputContent(outputs)
+            let mappedLatestOutput = firstNonEmpty(
+                newestOutput,
+                detail?.latestOutput,
+                task.latestAIOutput
+            )
+            task.latestAIOutput = mappedLatestOutput
+            task.generatedReply = firstNonEmpty(detail?.generatedReply, task.generatedReply, mappedLatestOutput)
+
+            if let draftText = normalizedNonEmptyString(detail?.generatedReply) {
+                task.replyDraft = draftText
+            }
+
+            let mappedTimeline = mapBackendTimeline(events, fallbackDate: task.createdAt)
+            if !mappedTimeline.isEmpty {
+                task.timeline = mappedTimeline
+                task.lastEventPreview = firstNonEmpty(
+                    mappedTimeline.first?.detail,
+                    mappedTimeline.first?.title,
+                    task.lastEventPreview
+                )
+            }
+
+            if let selectedReminder = preferredRemoteReminder(reminders) {
+                if let reminderDate = parseISO8601Date(selectedReminder.remindAtISO8601) {
+                    task.reminderDate = reminderDate
+                }
+
+                if let backendReminderID = normalizedNonEmptyString(selectedReminder.reminderID) {
+                    task.backendReminderID = backendReminderID
+                }
+
+                if let reminderNotificationID = normalizedNonEmptyString(selectedReminder.iosNotificationID) {
+                    task.reminderNotificationID = reminderNotificationID
+                }
+            }
+        }
+
+        rebuildBackendTaskIDToLocalIDMap()
+    }
+
+    private func mapBackendTimeline(_ events: [BackendTaskEventDTO], fallbackDate: Date) -> [TaskTimelineEntry] {
+        let mapped = events.compactMap { event -> TaskTimelineEntry? in
+            let title = firstNonEmpty(event.title, "Update")
+            let detail = firstNonEmpty(event.detail, title, "Task updated.")
+            let date = parseISO8601Date(event.createdAtISO8601) ?? fallbackDate
+            return TaskTimelineEntry(title: title, detail: detail, date: date)
+        }
+
+        return mapped.sorted { $0.date > $1.date }
+    }
+
+    private func newestBackendOutputContent(_ outputs: [BackendTaskOutputDTO]) -> String? {
+        let sortedOutputs = outputs.sorted { lhs, rhs in
+            let lhsDate = parseISO8601Date(lhs.createdAtISO8601) ?? .distantPast
+            let rhsDate = parseISO8601Date(rhs.createdAtISO8601) ?? .distantPast
+            return lhsDate > rhsDate
+        }
+
+        for output in sortedOutputs {
+            if let content = normalizedNonEmptyString(output.content) {
+                return content
+            }
+        }
+
+        return nil
+    }
+
+    private func preferredRemoteReminder(_ reminders: [BackendReminderDTO]) -> BackendReminderDTO? {
+        let activeReminders = reminders.filter { reminder in
+            guard let status = normalizedNonEmptyString(reminder.status)?.lowercased() else {
+                return true
+            }
+
+            return !status.contains("canceled") &&
+                !status.contains("cancelled") &&
+                !status.contains("completed") &&
+                !status.contains("done")
+        }
+
+        let candidates = activeReminders.isEmpty ? reminders : activeReminders
+        let datedCandidates = candidates.compactMap { reminder -> (BackendReminderDTO, Date)? in
+            guard let date = parseISO8601Date(reminder.remindAtISO8601) else { return nil }
+            return (reminder, date)
+        }
+
+        if datedCandidates.isEmpty {
+            return candidates.first
+        }
+
+        if let nearestUpcoming = datedCandidates
+            .filter({ $0.1 >= Date() })
+            .sorted(by: { $0.1 < $1.1 })
+            .first {
+            return nearestUpcoming.0
+        }
+
+        return datedCandidates.sorted(by: { $0.1 > $1.1 }).first?.0
+    }
+
+    private func parseISO8601Date(_ value: String?) -> Date? {
+        guard let value = normalizedNonEmptyString(value) else { return nil }
+        if let date = isoDateTimeFormatterWithFractionalSeconds.date(from: value) {
+            return date
+        }
+        return isoDateTimeFormatter.date(from: value)
+    }
+
+    private func normalizeBackendTaskID(_ backendTaskID: String?) -> String? {
+        normalizedNonEmptyString(backendTaskID)
+    }
+
+    private func localTaskID(forBackendTaskID backendTaskID: String, existingID: UUID?) -> UUID {
+        if let existingID {
+            backendTaskIDToLocalID[backendTaskID] = existingID
+            return existingID
+        }
+
+        if let mapped = backendTaskIDToLocalID[backendTaskID] {
+            return mapped
+        }
+
+        if let uuidValue = UUID(uuidString: backendTaskID) {
+            backendTaskIDToLocalID[backendTaskID] = uuidValue
+            return uuidValue
+        }
+
+        let generatedID = UUID()
+        backendTaskIDToLocalID[backendTaskID] = generatedID
+        return generatedID
+    }
+
+    private func rebuildBackendTaskIDToLocalIDMap() {
+        backendTaskIDToLocalID = Dictionary(
+            uniqueKeysWithValues: tasks.compactMap { task in
+                guard let backendTaskID = normalizeBackendTaskID(task.backendTaskID) else { return nil }
+                return (backendTaskID, task.id)
+            }
+        )
+    }
+
+    private func normalizedNonEmptyString(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private var isoDateTimeFormatter: ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }
+
+    private var isoDateTimeFormatterWithFractionalSeconds: ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }
 
     private func updateTask(_ taskID: UUID, update: (inout MockTask) -> Void) {

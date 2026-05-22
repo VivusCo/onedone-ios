@@ -665,20 +665,34 @@ struct BackendTaskSummaryDTO: Decodable {
     var title: String?
     var status: String?
     var category: String?
+    var createdAtISO8601: String?
     var currentNextStep: String?
     var lastEventPreview: String?
     var dueAtISO8601: String?
     var reminderAtISO8601: String?
 
-    enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
-        case title
-        case status
-        case category
-        case currentNextStep = "current_next_step"
-        case lastEventPreview = "last_event_preview"
-        case dueAtISO8601 = "due_at"
-        case reminderAtISO8601 = "reminder_at"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        guard let resolvedTaskID = container.decodeString(forKeys: ["task_id", "id"]) else {
+            throw DecodingError.valueNotFound(
+                String.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Missing task_id/id for BackendTaskSummaryDTO"
+                )
+            )
+        }
+
+        taskID = resolvedTaskID
+        title = container.decodeString(forKeys: ["title", "task_title"])
+        status = container.decodeString(forKeys: ["status"])
+        category = container.decodeString(forKeys: ["category"])
+        createdAtISO8601 = container.decodeString(forKeys: ["created_at"])
+        currentNextStep = container.decodeString(forKeys: ["current_next_step", "currentNextStep"])
+        lastEventPreview = container.decodeString(forKeys: ["last_event_preview", "event_message"])
+        dueAtISO8601 = container.decodeString(forKeys: ["due_at"])
+        reminderAtISO8601 = container.decodeString(forKeys: ["reminder_at", "remind_at"])
     }
 }
 
@@ -687,6 +701,7 @@ struct BackendTaskDetailDTO: Decodable {
     var title: String?
     var status: String?
     var category: String?
+    var createdAtISO8601: String?
     var prompt: String?
     var clarification: String?
     var latestOutput: String?
@@ -695,18 +710,31 @@ struct BackendTaskDetailDTO: Decodable {
     var dueAtISO8601: String?
     var reminderAtISO8601: String?
 
-    enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
-        case title
-        case status
-        case category
-        case prompt
-        case clarification
-        case latestOutput = "latest_output"
-        case generatedReply = "generated_reply"
-        case currentNextStep = "current_next_step"
-        case dueAtISO8601 = "due_at"
-        case reminderAtISO8601 = "reminder_at"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        guard let resolvedTaskID = container.decodeString(forKeys: ["task_id", "id"]) else {
+            throw DecodingError.valueNotFound(
+                String.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Missing task_id/id for BackendTaskDetailDTO"
+                )
+            )
+        }
+
+        taskID = resolvedTaskID
+        title = container.decodeString(forKeys: ["title", "task_title"])
+        status = container.decodeString(forKeys: ["status"])
+        category = container.decodeString(forKeys: ["category"])
+        createdAtISO8601 = container.decodeString(forKeys: ["created_at"])
+        prompt = container.decodeString(forKeys: ["prompt", "description"])
+        clarification = container.decodeString(forKeys: ["clarification"])
+        latestOutput = container.decodeString(forKeys: ["latest_output", "output", "current_output"])
+        generatedReply = container.decodeString(forKeys: ["generated_reply", "reply_draft"])
+        currentNextStep = container.decodeString(forKeys: ["current_next_step", "currentNextStep"])
+        dueAtISO8601 = container.decodeString(forKeys: ["due_at"])
+        reminderAtISO8601 = container.decodeString(forKeys: ["reminder_at", "remind_at"])
     }
 }
 
@@ -717,12 +745,14 @@ struct BackendTaskOutputDTO: Decodable {
     var kind: String?
     var createdAtISO8601: String?
 
-    enum CodingKeys: String, CodingKey {
-        case outputID = "output_id"
-        case taskID = "task_id"
-        case content
-        case kind
-        case createdAtISO8601 = "created_at"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        outputID = container.decodeString(forKeys: ["output_id", "id"])
+        taskID = container.decodeString(forKeys: ["task_id"])
+        content = container.decodeString(forKeys: ["content"])
+        kind = container.decodeString(forKeys: ["kind", "output_type"])
+        createdAtISO8601 = container.decodeString(forKeys: ["created_at"])
     }
 }
 
@@ -733,12 +763,14 @@ struct BackendTaskEventDTO: Decodable {
     var detail: String?
     var createdAtISO8601: String?
 
-    enum CodingKeys: String, CodingKey {
-        case eventID = "event_id"
-        case taskID = "task_id"
-        case title
-        case detail
-        case createdAtISO8601 = "created_at"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        eventID = container.decodeString(forKeys: ["event_id", "id"])
+        taskID = container.decodeString(forKeys: ["task_id"])
+        title = container.decodeString(forKeys: ["title", "event_type"])
+        detail = container.decodeString(forKeys: ["detail", "event_message"])
+        createdAtISO8601 = container.decodeString(forKeys: ["created_at"])
     }
 }
 
@@ -748,11 +780,20 @@ struct BackendChecklistItemDTO: Decodable {
     var text: String?
     var isDone: Bool?
 
-    enum CodingKeys: String, CodingKey {
-        case itemID = "item_id"
-        case taskID = "task_id"
-        case text
-        case isDone = "is_done"
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        itemID = container.decodeString(forKeys: ["item_id", "id"])
+        taskID = container.decodeString(forKeys: ["task_id"])
+        text = container.decodeString(forKeys: ["text", "content"])
+
+        if let explicit = container.decodeBool(forKeys: ["is_done"]) {
+            isDone = explicit
+        } else if let status = container.decodeString(forKeys: ["status"]) {
+            isDone = status.lowercased() == "done"
+        } else {
+            isDone = nil
+        }
     }
 }
 
@@ -763,11 +804,13 @@ struct BackendReminderDTO: Decodable {
     var iosNotificationID: String?
     var status: String?
 
-    enum CodingKeys: String, CodingKey {
-        case reminderID = "reminder_id"
-        case taskID = "task_id"
-        case remindAtISO8601 = "remind_at"
-        case iosNotificationID = "ios_notification_id"
-        case status
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        reminderID = container.decodeString(forKeys: ["reminder_id", "id"])
+        taskID = container.decodeString(forKeys: ["task_id"])
+        remindAtISO8601 = container.decodeString(forKeys: ["remind_at"])
+        iosNotificationID = container.decodeString(forKeys: ["ios_notification_id"])
+        status = container.decodeString(forKeys: ["status"])
     }
 }
