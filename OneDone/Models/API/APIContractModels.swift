@@ -88,17 +88,150 @@ enum AnalyzeTaskResponseType: String, Codable {
     }
 }
 
+private struct AnalyzeTaskDynamicKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
+}
+
+private struct AnalyzeTaskLooseOption: Decodable {
+    let label: String?
+    let title: String?
+    let value: String?
+    let text: String?
+    let name: String?
+    let message: String?
+
+    var resolvedText: String? {
+        [label, title, value, text, name, message]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
+    }
+}
+
+private struct AnalyzeTaskTaskReference: Decodable {
+    let id: String?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        if let id = container.decodeString(forKeys: ["id", "task_id"]) {
+            self.id = id
+        } else {
+            self.id = nil
+        }
+    }
+}
+
+private extension KeyedDecodingContainer where Key == AnalyzeTaskDynamicKey {
+    func decodeString(forKeys keys: [String]) -> String? {
+        for rawKey in keys {
+            guard let key = AnalyzeTaskDynamicKey(stringValue: rawKey), contains(key) else { continue }
+
+            if let stringValue = (try? decodeIfPresent(String.self, forKey: key)) ?? nil {
+                let trimmed = stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    return trimmed
+                }
+            }
+
+            if let intValue = (try? decodeIfPresent(Int.self, forKey: key)) ?? nil {
+                return String(intValue)
+            }
+        }
+
+        return nil
+    }
+
+    func decodeBool(forKeys keys: [String]) -> Bool? {
+        for rawKey in keys {
+            guard let key = AnalyzeTaskDynamicKey(stringValue: rawKey), contains(key) else { continue }
+
+            if let boolValue = (try? decodeIfPresent(Bool.self, forKey: key)) ?? nil {
+                return boolValue
+            }
+        }
+
+        return nil
+    }
+
+    func decodeStringArray(forKeys keys: [String]) -> [String]? {
+        for rawKey in keys {
+            guard let key = AnalyzeTaskDynamicKey(stringValue: rawKey), contains(key) else { continue }
+
+            if let values = (try? decodeIfPresent([String].self, forKey: key)) ?? nil {
+                let normalized = values
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                if !normalized.isEmpty {
+                    return normalized
+                }
+            }
+
+            if let values = (try? decodeIfPresent([AnalyzeTaskLooseOption].self, forKey: key)) ?? nil {
+                let normalized = values.compactMap(\.resolvedText)
+                if !normalized.isEmpty {
+                    return normalized
+                }
+            }
+
+            if let singleValue = (try? decodeIfPresent(String.self, forKey: key)) ?? nil {
+                let trimmed = singleValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    return [trimmed]
+                }
+            }
+        }
+
+        return nil
+    }
+
+    func decodeObject<T: Decodable>(forKeys keys: [String], as type: T.Type = T.self) -> T? {
+        for rawKey in keys {
+            guard let key = AnalyzeTaskDynamicKey(stringValue: rawKey), contains(key) else { continue }
+            if let value = (try? decodeIfPresent(type, forKey: key)) ?? nil {
+                return value
+            }
+        }
+
+        return nil
+    }
+}
+
 struct AnalyzeTaskClarificationPayload: Decodable {
     var question: String?
     var helperText: String?
     var options: [String]
     var title: String?
 
-    enum CodingKeys: String, CodingKey {
-        case question
-        case helperText = "helper_text"
-        case options
-        case title
+    init(
+        question: String?,
+        helperText: String?,
+        options: [String],
+        title: String?
+    ) {
+        self.question = question
+        self.helperText = helperText
+        self.options = options
+        self.title = title
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        question = container.decodeString(forKeys: ["question", "prompt"])
+        helperText = container.decodeString(forKeys: ["helper_text", "helperText", "hint"])
+        title = container.decodeString(forKeys: ["title", "heading"])
+        options = container.decodeStringArray(forKeys: ["options", "choices", "answers"]) ?? []
     }
 }
 
@@ -110,19 +243,54 @@ struct AnalyzeTaskAnalysisPayload: Decodable {
     var nextSteps: [String]
     var category: String?
 
-    enum CodingKeys: String, CodingKey {
-        case title
-        case summary
-        case latestOutput = "latest_output"
-        case checklist
-        case nextSteps = "next_steps"
-        case category
+    init(
+        title: String?,
+        summary: String?,
+        latestOutput: String?,
+        checklist: [String],
+        nextSteps: [String],
+        category: String?
+    ) {
+        self.title = title
+        self.summary = summary
+        self.latestOutput = latestOutput
+        self.checklist = checklist
+        self.nextSteps = nextSteps
+        self.category = category
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        title = container.decodeString(forKeys: ["title", "task_title", "heading"])
+        summary = container.decodeString(forKeys: ["summary", "analysis", "message", "explanation"])
+        latestOutput = container.decodeString(forKeys: ["latest_output", "latestOutput", "output"])
+        checklist = container.decodeStringArray(forKeys: ["checklist", "checklist_items", "steps", "action_plan"]) ?? []
+        nextSteps = container.decodeStringArray(forKeys: ["next_steps", "nextSteps", "recommended_steps", "action_steps"]) ?? []
+
+        if nextSteps.isEmpty,
+           let nextStep = container.decodeString(forKeys: ["next_step"]) {
+            nextSteps = [nextStep]
+        }
+
+        category = container.decodeString(forKeys: ["category", "intent"])
     }
 }
 
 struct AnalyzeTaskSplitPreviewItem: Decodable {
     var id: String?
     var title: String
+
+    init(id: String?, title: String) {
+        self.id = id
+        self.title = title
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+        id = container.decodeString(forKeys: ["id", "task_id"])
+        title = container.decodeString(forKeys: ["title", "name", "label", "summary"]) ?? "Task"
+    }
 }
 
 struct AnalyzeTaskSplitPreviewPayload: Decodable {
@@ -130,10 +298,22 @@ struct AnalyzeTaskSplitPreviewPayload: Decodable {
     var message: String?
     var items: [AnalyzeTaskSplitPreviewItem]
 
-    enum CodingKeys: String, CodingKey {
-        case title
-        case message
-        case items
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+        title = container.decodeString(forKeys: ["title", "heading"])
+        message = container.decodeString(forKeys: ["message", "summary"])
+        items = container.decodeObject(forKeys: ["items", "tasks", "suggested_tasks"]) ?? []
+
+        if items.isEmpty,
+           let fallbackItems = container.decodeStringArray(forKeys: ["items", "tasks", "suggested_tasks"]) {
+            items = fallbackItems.map { AnalyzeTaskSplitPreviewItem(id: nil, title: $0) }
+        }
+    }
+
+    init(title: String?, message: String?, items: [AnalyzeTaskSplitPreviewItem]) {
+        self.title = title
+        self.message = message
+        self.items = items
     }
 }
 
@@ -141,6 +321,27 @@ struct AnalyzeTaskErrorPayload: Decodable {
     var code: String?
     var message: String?
     var retryable: Bool?
+
+    init(from decoder: Decoder) throws {
+        if let singleContainer = try? decoder.singleValueContainer(),
+           let message = try? singleContainer.decode(String.self) {
+            code = nil
+            self.message = message
+            retryable = nil
+            return
+        }
+
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+        code = container.decodeString(forKeys: ["code", "error_code"])
+        message = container.decodeString(forKeys: ["message", "error_description", "detail", "error"])
+        retryable = container.decodeBool(forKeys: ["retryable"])
+    }
+
+    init(code: String?, message: String?, retryable: Bool?) {
+        self.code = code
+        self.message = message
+        self.retryable = retryable
+    }
 }
 
 struct AnalyzeTaskResponseDTO: Decodable {
@@ -153,27 +354,112 @@ struct AnalyzeTaskResponseDTO: Decodable {
     var message: String?
     var access: APIAccessStatePayload?
 
-    enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
-        case responseType = "response_type"
-        case clarification
-        case taskAnalysis = "task_analysis"
-        case multiTaskSplitPreview = "multi_task_split_preview"
-        case error
-        case message
-        case access
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        taskID = container.decodeString(forKeys: ["task_id", "taskId", "id"])
+        if taskID == nil {
+            let taskReference: AnalyzeTaskTaskReference? = container.decodeObject(forKeys: ["task", "task_ref", "life_task"])
+            taskID = taskReference?.id
+        }
+
+        let responseTypeRaw = container.decodeString(forKeys: ["response_type", "responseType", "type"])
+        responseType = AnalyzeTaskResponseType(rawValue: responseTypeRaw ?? "") ?? .unknown
+
+        clarification = container.decodeObject(forKeys: ["clarification", "clarification_payload"])
+        taskAnalysis = container.decodeObject(forKeys: ["task_analysis", "analysis"])
+        multiTaskSplitPreview = container.decodeObject(forKeys: ["multi_task_split_preview", "split_preview"])
+        access = container.decodeObject(forKeys: ["access"])
+
+        let explicitError: AnalyzeTaskErrorPayload? = container.decodeObject(forKeys: ["error"])
+        let inferredErrorCode = container.decodeString(forKeys: ["error_code"])
+        let inferredErrorMessage = container.decodeString(forKeys: ["error_message", "error_description", "detail"])
+        let inferredRetryable = container.decodeBool(forKeys: ["retryable"])
+        error = explicitError ?? {
+            if inferredErrorCode != nil || inferredErrorMessage != nil {
+                return AnalyzeTaskErrorPayload(
+                    code: inferredErrorCode,
+                    message: inferredErrorMessage,
+                    retryable: inferredRetryable
+                )
+            }
+            return nil
+        }()
+
+        message = container.decodeString(forKeys: ["message", "detail", "status_message"]) ?? error?.message
+
+        if clarification == nil {
+            let inferredClarification = AnalyzeTaskClarificationPayload(
+                question: container.decodeString(forKeys: ["question", "clarification_question"]),
+                helperText: container.decodeString(forKeys: ["helper_text", "clarification_helper_text"]),
+                options: container.decodeStringArray(forKeys: ["options", "clarification_options"]) ?? [],
+                title: container.decodeString(forKeys: ["title", "clarification_title"])
+            )
+
+            if inferredClarification.question != nil || !inferredClarification.options.isEmpty {
+                clarification = inferredClarification
+            }
+        }
+
+        if taskAnalysis == nil {
+            let inferredAnalysis = AnalyzeTaskAnalysisPayload(
+                title: container.decodeString(forKeys: ["title", "task_title"]),
+                summary: container.decodeString(forKeys: ["summary", "analysis", "latest_output", "message"]),
+                latestOutput: container.decodeString(forKeys: ["latest_output"]),
+                checklist: container.decodeStringArray(forKeys: ["checklist", "checklist_items", "steps"]) ?? [],
+                nextSteps: container.decodeStringArray(forKeys: ["next_steps", "action_steps"]) ?? [],
+                category: container.decodeString(forKeys: ["category"])
+            )
+
+            if inferredAnalysis.summary != nil ||
+                inferredAnalysis.latestOutput != nil ||
+                !inferredAnalysis.checklist.isEmpty ||
+                !inferredAnalysis.nextSteps.isEmpty {
+                taskAnalysis = inferredAnalysis
+            }
+        }
+
+        if multiTaskSplitPreview == nil,
+           let splitItems = container.decodeStringArray(forKeys: ["split_items", "tasks", "suggested_tasks"]) {
+            let mappedItems = splitItems.map { AnalyzeTaskSplitPreviewItem(id: nil, title: $0) }
+            multiTaskSplitPreview = AnalyzeTaskSplitPreviewPayload(
+                title: container.decodeString(forKeys: ["title"]),
+                message: container.decodeString(forKeys: ["message"]),
+                items: mappedItems
+            )
+        }
+
+        if responseType == .unknown {
+            if clarification != nil {
+                responseType = .clarification
+            } else if taskAnalysis != nil {
+                responseType = .taskAnalysis
+            } else if multiTaskSplitPreview != nil {
+                responseType = .multiTaskSplitPreview
+            } else if error?.code == "rate_limited" {
+                responseType = .rateLimited
+            }
+        }
     }
 
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        taskID = try container.decodeIfPresent(String.self, forKey: .taskID)
-        responseType = try container.decodeIfPresent(AnalyzeTaskResponseType.self, forKey: .responseType) ?? .unknown
-        clarification = try container.decodeIfPresent(AnalyzeTaskClarificationPayload.self, forKey: .clarification)
-        taskAnalysis = try container.decodeIfPresent(AnalyzeTaskAnalysisPayload.self, forKey: .taskAnalysis)
-        multiTaskSplitPreview = try container.decodeIfPresent(AnalyzeTaskSplitPreviewPayload.self, forKey: .multiTaskSplitPreview)
-        error = try container.decodeIfPresent(AnalyzeTaskErrorPayload.self, forKey: .error)
-        message = try container.decodeIfPresent(String.self, forKey: .message)
-        access = try container.decodeIfPresent(APIAccessStatePayload.self, forKey: .access)
+    init(
+        taskID: String?,
+        responseType: AnalyzeTaskResponseType,
+        clarification: AnalyzeTaskClarificationPayload?,
+        taskAnalysis: AnalyzeTaskAnalysisPayload?,
+        multiTaskSplitPreview: AnalyzeTaskSplitPreviewPayload?,
+        error: AnalyzeTaskErrorPayload?,
+        message: String?,
+        access: APIAccessStatePayload?
+    ) {
+        self.taskID = taskID
+        self.responseType = responseType
+        self.clarification = clarification
+        self.taskAnalysis = taskAnalysis
+        self.multiTaskSplitPreview = multiTaskSplitPreview
+        self.error = error
+        self.message = message
+        self.access = access
     }
 }
 

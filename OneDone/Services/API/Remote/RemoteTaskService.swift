@@ -61,6 +61,7 @@ struct RemoteTaskService: TaskServiceProtocol {
 
             let payload = decodeAnalyzePayload(from: data)
             let statusCode = httpResponse.statusCode
+            logAnalyzeDiagnostics(statusCode: statusCode, payload: payload, data: data)
 
             if isAccessStatus(statusCode) {
                 let message = payloadMessage(payload) ?? "Your current access does not allow creating new tasks."
@@ -306,37 +307,16 @@ struct RemoteTaskService: TaskServiceProtocol {
     }
 
     private func mapPayload(_ payload: AnalyzeTaskResponseDTO) throws -> AnalyzeTaskServiceResponse {
-        if case .accessError = payload.responseType {
-            throw AnalyzeTaskServiceError.accessDenied(
-                message: payloadMessage(payload) ?? "Your current access does not allow creating new tasks."
-            )
-        }
-
-        if case .paywallError = payload.responseType {
-            throw AnalyzeTaskServiceError.accessDenied(
-                message: payloadMessage(payload) ?? "Start trial or subscription to continue creating tasks."
-            )
-        }
-
-        if case .retryableError = payload.responseType {
-            throw AnalyzeTaskServiceError.retryable(
-                message: payloadMessage(payload) ?? "Task analysis is temporarily unavailable. Please retry."
-            )
-        }
-
-        if case .rateLimited = payload.responseType {
-            throw AnalyzeTaskServiceError.rateLimited(
-                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
-            )
-        }
-
-        if payload.error?.code == "rate_limited" {
-            throw AnalyzeTaskServiceError.rateLimited(
-                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
-            )
+        if let classifiedError = classifyAnalyzePayloadError(payload) {
+            throw classifiedError
         }
 
         guard let taskID = payload.taskID, !taskID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            if let message = payloadMessage(payload),
+               !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw AnalyzeTaskServiceError.unsupportedResponse(message: message)
+            }
+
             throw AnalyzeTaskServiceError.missingTaskID
         }
 
@@ -389,11 +369,33 @@ struct RemoteTaskService: TaskServiceProtocol {
     }
 
     private func decodeAnalyzePayload(from data: Data) -> AnalyzeTaskResponseDTO? {
-        decodeSingleWrapper(data, as: AnalyzeTaskResponseDTO.self)
+        if let direct = decodeSingleWrapper(data, as: AnalyzeTaskResponseDTO.self) {
+            return direct
+        }
+
+        guard let jsonObject = try? JSONSerialization.jsonObject(with: data) else {
+            return nil
+        }
+
+        for candidate in analyzePayloadCandidates(from: jsonObject) {
+            guard JSONSerialization.isValidJSONObject(candidate),
+                  let candidateData = try? JSONSerialization.data(withJSONObject: candidate),
+                  var payload = decodeSingleWrapper(candidateData, as: AnalyzeTaskResponseDTO.self) else {
+                continue
+            }
+
+            enrichAnalyzePayload(&payload, withRootJSONObject: jsonObject)
+
+            if hasAnalyzeSignal(payload) {
+                return payload
+            }
+        }
+
+        return nil
     }
 
     private func payloadMessage(_ payload: AnalyzeTaskResponseDTO?) -> String? {
-        payload?.error?.message ?? payload?.message
+        sanitizeBackendMessage(payload?.error?.message ?? payload?.message)
     }
 
     private func isAccessStatus(_ statusCode: Int) -> Bool {
@@ -492,7 +494,7 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         if let wrapped = try? JSONDecoder().decode(AnalyzeTaskResponseWrapper<T>.self, from: data) {
-            return wrapped.data ?? wrapped.result ?? wrapped.response
+            return wrapped.data ?? wrapped.result ?? wrapped.response ?? wrapped.payload
         }
 
         return nil
@@ -504,10 +506,303 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         if let wrapped = try? JSONDecoder().decode(AnalyzeTaskArrayResponseWrapper<T>.self, from: data) {
-            return wrapped.data ?? wrapped.result ?? wrapped.response
+            return wrapped.data ?? wrapped.result ?? wrapped.response ?? wrapped.payload
         }
 
         return nil
+    }
+
+    private func classifyAnalyzePayloadError(_ payload: AnalyzeTaskResponseDTO) -> AnalyzeTaskServiceError? {
+        switch payload.responseType {
+        case .accessError:
+            return .accessDenied(
+                message: payloadMessage(payload) ?? "Your current access does not allow creating new tasks."
+            )
+        case .paywallError:
+            return .accessDenied(
+                message: payloadMessage(payload) ?? "Start trial or subscription to continue creating tasks."
+            )
+        case .retryableError:
+            return .retryable(
+                message: payloadMessage(payload) ?? "Task analysis is temporarily unavailable. Please retry."
+            )
+        case .rateLimited:
+            return .rateLimited(
+                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
+            )
+        case .clarification, .taskAnalysis, .multiTaskSplitPreview, .unknown:
+            break
+        }
+
+        let errorCode = normalizedCode(payload.error?.code)
+        let message = payloadMessage(payload)?.lowercased() ?? ""
+        let hasSuccessPayload =
+            payload.clarification != nil ||
+            payload.taskAnalysis != nil ||
+            payload.multiTaskSplitPreview != nil
+        let hasErrorPayload = payload.error != nil
+        let shouldUseErrorHeuristics =
+            hasErrorPayload ||
+            (payload.responseType == .unknown && !hasSuccessPayload)
+
+        if !shouldUseErrorHeuristics {
+            return nil
+        }
+
+        if errorCode == "rate_limited" || message.contains("rate limit") || message.contains("too many requests") {
+            return .rateLimited(
+                message: payloadMessage(payload) ?? "Too many requests right now. Please try again in a moment."
+            )
+        }
+
+        if isAccessLikeError(code: errorCode, message: message) {
+            return .accessDenied(
+                message: payloadMessage(payload) ?? "Your current access does not allow creating new tasks."
+            )
+        }
+
+        if isAuthLikeError(code: errorCode, message: message) {
+            return .accessDenied(
+                message: "Your session expired. Please log in again."
+            )
+        }
+
+        if isValidationLikeError(code: errorCode, message: message) {
+            return .unsupportedResponse(
+                message: "Please check your task text and try again."
+            )
+        }
+
+        if payload.error?.retryable == true || isRetryableLikeError(code: errorCode, message: message) {
+            return .retryable(
+                message: payloadMessage(payload) ?? "Could not analyze this task right now. Please try again."
+            )
+        }
+
+        if hasErrorPayload {
+            return .retryable(
+                message: payloadMessage(payload) ?? "Could not analyze this task right now. Please try again."
+            )
+        }
+
+        return nil
+    }
+
+    private func isAuthLikeError(code: String?, message: String) -> Bool {
+        if let code {
+            if code.contains("auth") || code.contains("session") || code.contains("token") || code.contains("unauthorized") {
+                return true
+            }
+        }
+
+        return message.contains("jwt") ||
+            message.contains("token") ||
+            message.contains("session") ||
+            message.contains("unauthorized") ||
+            message.contains("forbidden")
+    }
+
+    private func isAccessLikeError(code: String?, message: String) -> Bool {
+        if let code {
+            if code.contains("access") ||
+                code.contains("paywall") ||
+                code.contains("trial") ||
+                code.contains("subscription") ||
+                code.contains("starter") ||
+                code.contains("billing_issue") ||
+                code.contains("grace_period") {
+                return true
+            }
+        }
+
+        return message.contains("access") ||
+            message.contains("trial") ||
+            message.contains("subscription") ||
+            message.contains("starter") ||
+            message.contains("billing") ||
+            message.contains("paywall")
+    }
+
+    private func isValidationLikeError(code: String?, message: String) -> Bool {
+        if let code {
+            if code.contains("validation") ||
+                code.contains("invalid_input") ||
+                code.contains("bad_request") ||
+                code.contains("missing_input") ||
+                code.contains("missing_fields") ||
+                code.contains("parse_error") {
+                return true
+            }
+        }
+
+        return message.contains("validation") ||
+            message.contains("invalid") ||
+            message.contains("missing") ||
+            message.contains("parse request body as json") ||
+            message.contains("unexpected end of json input")
+    }
+
+    private func isRetryableLikeError(code: String?, message: String) -> Bool {
+        if let code {
+            if code.contains("retryable") ||
+                code.contains("processing_error") ||
+                code.contains("temporary") ||
+                code.contains("timeout") {
+                return true
+            }
+        }
+
+        return message.contains("try again") ||
+            message.contains("temporarily unavailable") ||
+            message.contains("timeout")
+    }
+
+    private func normalizedCode(_ code: String?) -> String? {
+        guard let code else { return nil }
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.replacingOccurrences(of: "-", with: "_")
+    }
+
+    private func sanitizeBackendMessage(_ message: String?) -> String? {
+        guard let message else { return nil }
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let lowercased = trimmed.lowercased()
+        if lowercased.contains("could not parse request body as json") ||
+            lowercased.contains("unexpected end of json input") {
+            return "Please check your task text and try again."
+        }
+
+        if lowercased.contains("jwt") && lowercased.contains("expired") {
+            return "Your session expired. Please log in again."
+        }
+
+        return trimmed
+    }
+
+    private func hasAnalyzeSignal(_ payload: AnalyzeTaskResponseDTO) -> Bool {
+        if payload.responseType != .unknown {
+            return true
+        }
+
+        return payload.taskID != nil ||
+            payload.clarification != nil ||
+            payload.taskAnalysis != nil ||
+            payload.multiTaskSplitPreview != nil ||
+            payload.error != nil ||
+            payload.message != nil
+    }
+
+    private func analyzePayloadCandidates(from object: Any) -> [[String: Any]] {
+        var candidates: [[String: Any]] = []
+        var queue: [(node: Any, depth: Int)] = [(object, 0)]
+        let preferredKeys: Set<String> = ["data", "result", "response", "payload"]
+        let maxDepth = 4
+
+        while let current = queue.first {
+            queue.removeFirst()
+            guard current.depth <= maxDepth else { continue }
+
+            if let dictionary = current.node as? [String: Any] {
+                candidates.append(dictionary)
+
+                for key in preferredKeys {
+                    if let nested = dictionary[key] {
+                        queue.append((nested, current.depth + 1))
+                    }
+                }
+
+                for value in dictionary.values {
+                    if value is [String: Any] || value is [Any] {
+                        queue.append((value, current.depth + 1))
+                    }
+                }
+            } else if let array = current.node as? [Any] {
+                for value in array where value is [String: Any] || value is [Any] {
+                    queue.append((value, current.depth + 1))
+                }
+            }
+        }
+
+        return candidates
+    }
+
+    private func enrichAnalyzePayload(_ payload: inout AnalyzeTaskResponseDTO, withRootJSONObject root: Any) {
+        guard let rootDictionary = root as? [String: Any] else { return }
+
+        if payload.taskID == nil {
+            payload.taskID = jsonStringValue(in: rootDictionary, keys: ["task_id", "taskId", "id"])
+            if payload.taskID == nil,
+               let taskObject = rootDictionary["task"] as? [String: Any] {
+                payload.taskID = jsonStringValue(in: taskObject, keys: ["id", "task_id"])
+            }
+        }
+
+        if payload.responseType == .unknown,
+           let responseType = jsonStringValue(in: rootDictionary, keys: ["response_type", "responseType", "type"]) {
+            payload.responseType = AnalyzeTaskResponseType(rawValue: responseType) ?? .unknown
+        }
+
+        if payload.message == nil {
+            payload.message = jsonStringValue(
+                in: rootDictionary,
+                keys: ["message", "status_message", "detail", "error_message", "error_description"]
+            )
+        }
+
+        if payload.error == nil {
+            let errorCode = jsonStringValue(in: rootDictionary, keys: ["error_code"])
+            let errorMessage = jsonStringValue(in: rootDictionary, keys: ["error_message", "error_description", "detail"])
+            if errorCode != nil || errorMessage != nil {
+                payload.error = AnalyzeTaskErrorPayload(
+                    code: errorCode,
+                    message: errorMessage,
+                    retryable: nil
+                )
+            }
+        }
+    }
+
+    private func jsonStringValue(in dictionary: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let value = dictionary[key] as? String {
+                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    return trimmed
+                }
+            }
+
+            if let intValue = dictionary[key] as? Int {
+                return String(intValue)
+            }
+        }
+        return nil
+    }
+
+    private func logAnalyzeDiagnostics(statusCode: Int, payload: AnalyzeTaskResponseDTO?, data: Data) {
+#if DEBUG
+        let responseTypeDescription: String
+        if let payload {
+            responseTypeDescription = "\(payload.responseType)"
+        } else {
+            responseTypeDescription = "unparsed"
+        }
+
+        let keys = topLevelJSONKeys(from: data)
+        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
+        print("[OneDone][AnalyzeTask] status=\(statusCode) responseType=\(responseTypeDescription) topLevelKeys=\(keysDescription)")
+#endif
+    }
+
+    private func topLevelJSONKeys(from data: Data) -> [String] {
+        guard let object = try? JSONSerialization.jsonObject(with: data),
+              let dictionary = object as? [String: Any] else {
+            return []
+        }
+
+        return dictionary.keys.sorted()
     }
 }
 
@@ -515,10 +810,12 @@ private struct AnalyzeTaskResponseWrapper<T: Decodable>: Decodable {
     let data: T?
     let result: T?
     let response: T?
+    let payload: T?
 }
 
 private struct AnalyzeTaskArrayResponseWrapper<T: Decodable>: Decodable {
     let data: [T]?
     let result: [T]?
     let response: [T]?
+    let payload: [T]?
 }
