@@ -103,6 +103,7 @@ enum NewTaskAnalysisResult {
 @Observable
 final class AppState {
     enum Phase {
+        case auth
         case welcome
         case onboarding
         case starterIntro
@@ -144,20 +145,36 @@ final class AppState {
     var accessStatusNote: String?
     var accessStateLoadErrorMessage: String?
     var pendingHomeGateState: APIAccessState?
+    var onboardingCompletionErrorMessage: String?
+    var isCompletingOnboarding: Bool = false
+
+    var authenticatedUserEmail: String?
+    var isAuthActionInProgress: Bool = false
+    var authErrorMessage: String?
+    var authInfoMessage: String?
 
     var remindersEnabled: Bool = true
     var hapticsEnabled: Bool = true
     var calmModeEnabled: Bool = true
     let services: AppServiceContainer
+    private let authService: any SupabaseAuthServiceProtocol
+    private let authSessionStore: any AuthSessionStoreProtocol
     private var didAttemptRemoteAccessBootstrap: Bool = false
     private var isRefreshingRemoteAccessState: Bool = false
     private var forceMockTaskFlowInSession: Bool = false
 
     var templates: [TaskTemplate] = MockRepository.templates
-    var tasks: [MockTask] = MockRepository.seedTasks
+    var tasks: [MockTask]
 
-    init(services: AppServiceContainer = .mock) {
+    init(
+        services: AppServiceContainer = .mock,
+        authService: any SupabaseAuthServiceProtocol = MockSupabaseAuthService(),
+        authSessionStore: any AuthSessionStoreProtocol = InMemoryAuthSessionStore()
+    ) {
         self.services = services
+        self.authService = authService
+        self.authSessionStore = authSessionStore
+        self.tasks = services.runtimeMode == .mock ? MockRepository.seedTasks : []
         self.phase = services.runtimeMode == .remoteAccessState ? .accessStateLoading : .welcome
     }
 
@@ -215,13 +232,16 @@ final class AppState {
     }
 
     func beginOnboarding() {
+        onboardingCompletionErrorMessage = nil
         phase = .onboarding
     }
 
-    func nextOnboardingPage() {
+    @MainActor
+    func nextOnboardingPage() async {
+        onboardingCompletionErrorMessage = nil
+
         guard onboardingPageIndex < onboardingPages.count - 1 else {
-            hasCompletedOnboarding = true
-            phase = .starterIntro
+            await finalizeOnboardingAndRoute()
             return
         }
 
@@ -229,6 +249,7 @@ final class AppState {
     }
 
     func previousOnboardingPage() {
+        onboardingCompletionErrorMessage = nil
         guard onboardingPageIndex > 0 else { return }
         onboardingPageIndex -= 1
     }
@@ -304,22 +325,29 @@ final class AppState {
 
     func enterMainApp() {
         completeStarterIntro()
-        startStarterAccess()
+        if services.runtimeMode == .mock || forceMockTaskFlowInSession {
+            startStarterAccess()
+        }
         phase = .main
     }
 
     @MainActor
-    func bootstrapAccessStateIfNeeded() async {
-        guard services.runtimeMode == .remoteAccessState else { return }
+    func bootstrapAppIfNeeded() async {
         guard !didAttemptRemoteAccessBootstrap else { return }
 
         didAttemptRemoteAccessBootstrap = true
-        await refreshAccessStateFromRemote()
+        if services.runtimeMode != .remoteAccessState {
+            return
+        }
+
+        await bootstrapRemoteRuntime()
     }
 
     @MainActor
     func retryAccessStateLoad() async {
         guard services.runtimeMode == .remoteAccessState else { return }
+        authErrorMessage = nil
+        authInfoMessage = nil
         await refreshAccessStateFromRemote()
     }
 
@@ -331,6 +359,12 @@ final class AppState {
         pendingHomeGateState = nil
         forceMockTaskFlowInSession = true
         setMockAccessState(.starter_active)
+        authenticatedUserEmail = nil
+        authErrorMessage = nil
+        authInfoMessage = "Development-only fallback is active."
+        if tasks.isEmpty {
+            tasks = MockRepository.seedTasks
+        }
         phase = .welcome
 #endif
     }
@@ -350,11 +384,15 @@ final class AppState {
     }
 
     var shouldUseRemoteTaskAnalysis: Bool {
-        services.runtimeMode == .remoteAccessState && !forceMockTaskFlowInSession
+        services.runtimeMode == .remoteAccessState &&
+            !forceMockTaskFlowInSession &&
+            authSessionStore.currentSession != nil
     }
 
     var shouldUseRemoteTaskActions: Bool {
-        services.runtimeMode == .remoteAccessState && !forceMockTaskFlowInSession
+        services.runtimeMode == .remoteAccessState &&
+            !forceMockTaskFlowInSession &&
+            authSessionStore.currentSession != nil
     }
 
     func makeDraft(prompt: String, template: TaskTemplate?) -> TaskDraft {
@@ -376,6 +414,14 @@ final class AppState {
 
             let localTask = finalizeTask(from: localDraft)
             return .taskAnalysis(localTask)
+        }
+
+        do {
+            try await ensureValidSessionForRemoteUse()
+        } catch {
+            throw AnalyzeTaskServiceError.accessDenied(
+                message: (error as? LocalizedError)?.errorDescription ?? "Please log in again to continue."
+            )
         }
 
         let request = AnalyzeTaskRequest(
@@ -477,6 +523,8 @@ final class AppState {
             throw TaskActionServiceError.missingBackendTaskID
         }
 
+        try await ensureValidSessionForRemoteUse()
+
         let request = AnswerClarificationRequest(taskID: backendTaskID, answer: answer)
         let remoteResponse = try await services.taskService.submitAnswerClarification(
             request,
@@ -558,6 +606,8 @@ final class AppState {
             language: language
         )
 
+        try await ensureValidSessionForRemoteUse()
+
         let response = try await services.taskService.submitGenerateReply(
             request,
             idempotencyKey: UUID().uuidString.lowercased()
@@ -598,6 +648,7 @@ final class AppState {
         )
 
         do {
+            try await ensureValidSessionForRemoteUse()
             let response = try await services.taskService.submitMessageMarkedSent(
                 request,
                 idempotencyKey: UUID().uuidString.lowercased()
@@ -642,6 +693,7 @@ final class AppState {
         }
 
         do {
+            try await ensureValidSessionForRemoteUse()
             _ = try await services.taskService.submitUpdateTaskStatus(
                 UpdateTaskStatusRequest(
                     taskID: backendTaskID,
@@ -739,6 +791,7 @@ final class AppState {
                let backendTaskID = existingTask.backendTaskID,
                !backendTaskID.isEmpty {
                 do {
+                    try await ensureValidSessionForRemoteUse()
                     let syncResponse: ReminderSyncResponse
                     if let existingReminderID = existingTask.backendReminderID {
                         syncResponse = try await services.reminderService.syncReminderUpdate(
@@ -822,6 +875,7 @@ final class AppState {
            let backendTaskID = existingTask.backendTaskID,
            !backendTaskID.isEmpty {
             do {
+                try await ensureValidSessionForRemoteUse()
                 _ = try await services.reminderService.syncReminderCancel(
                     ReminderCancelRequest(
                         taskID: backendTaskID,
@@ -884,6 +938,7 @@ final class AppState {
                let backendTaskID = existingTask.backendTaskID,
                !backendTaskID.isEmpty {
                 do {
+                    try await ensureValidSessionForRemoteUse()
                     let syncResponse = try await services.reminderService.syncReminderSnooze(
                         ReminderSnoozeRequest(
                             taskID: backendTaskID,
@@ -942,6 +997,176 @@ final class AppState {
     }
 
     @MainActor
+    func signUp(email: String, password: String) async {
+        guard !isAuthActionInProgress else { return }
+        isAuthActionInProgress = true
+        authErrorMessage = nil
+        authInfoMessage = nil
+        defer { isAuthActionInProgress = false }
+
+        do {
+            let result = try await authService.signUp(email: email, password: password)
+            switch result {
+            case let .authenticated(session):
+                try authSessionStore.persistSession(session)
+                authenticatedUserEmail = session.userEmail ?? email
+                authInfoMessage = nil
+                tasks.removeAll()
+                selectedTab = .home
+                await refreshAccessStateFromRemote()
+            case let .requiresEmailConfirmation(pendingEmail):
+                authInfoMessage = "Account created. Please confirm \(pendingEmail) from your email inbox, then log in."
+            }
+        } catch {
+            authErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not sign up right now. Please try again."
+        }
+    }
+
+    @MainActor
+    func logIn(email: String, password: String) async {
+        guard !isAuthActionInProgress else { return }
+        isAuthActionInProgress = true
+        authErrorMessage = nil
+        authInfoMessage = nil
+        defer { isAuthActionInProgress = false }
+
+        do {
+            let session = try await authService.logIn(email: email, password: password)
+            try authSessionStore.persistSession(session)
+            authenticatedUserEmail = session.userEmail ?? email
+            tasks.removeAll()
+            selectedTab = .home
+            await refreshAccessStateFromRemote()
+        } catch {
+            authErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not log in right now. Please try again."
+        }
+    }
+
+    @MainActor
+    func logOut() async {
+        let token = authSessionStore.currentSession?.accessToken
+        await authService.logOut(accessToken: token)
+
+        do {
+            try authSessionStore.clearSession()
+        } catch {
+            // Ignore cleanup error and continue to auth screen.
+        }
+
+        authenticatedUserEmail = nil
+        authErrorMessage = nil
+        authInfoMessage = nil
+        accessStateLoadErrorMessage = nil
+        onboardingCompletionErrorMessage = nil
+        pendingHomeGateState = nil
+        forceMockTaskFlowInSession = false
+        setMockAccessState(.unauthenticated)
+        phase = .auth
+        selectedTab = .home
+
+        if services.runtimeMode == .mock {
+            tasks = MockRepository.seedTasks
+        } else {
+            tasks = []
+        }
+    }
+
+    @MainActor
+    private func bootstrapRemoteRuntime() async {
+        authErrorMessage = nil
+        authInfoMessage = nil
+        accessStateLoadErrorMessage = nil
+        phase = .accessStateLoading
+
+        do {
+            let restoredSession = try authSessionStore.restoreSession()
+            guard let restoredSession else {
+                setMockAccessState(.unauthenticated)
+                phase = .auth
+                return
+            }
+
+            authenticatedUserEmail = restoredSession.userEmail
+
+            if restoredSession.isExpired || restoredSession.isExpiringSoon {
+                try await refreshSessionIfNeeded()
+            }
+
+            await refreshAccessStateFromRemote()
+        } catch let error as SupabaseAuthServiceError {
+            authErrorMessage = error.errorDescription
+            _ = try? authSessionStore.clearSession()
+            setMockAccessState(.unauthenticated)
+            phase = .auth
+        } catch {
+            authErrorMessage = (error as? LocalizedError)?.errorDescription ?? "Could not restore your session. Please log in again."
+            _ = try? authSessionStore.clearSession()
+            setMockAccessState(.unauthenticated)
+            phase = .auth
+        }
+    }
+
+    @MainActor
+    private func finalizeOnboardingAndRoute() async {
+        onboardingCompletionErrorMessage = nil
+
+        guard services.runtimeMode == .remoteAccessState, !forceMockTaskFlowInSession else {
+            hasCompletedOnboarding = true
+            phase = .starterIntro
+            return
+        }
+
+        guard !isCompletingOnboarding else { return }
+        isCompletingOnboarding = true
+        defer { isCompletingOnboarding = false }
+
+        do {
+            try await ensureValidSessionForRemoteUse()
+            let snapshot = try await services.accessStateService.completeOnboarding(
+                CompleteOnboardingRequest(userID: nil)
+            )
+
+            hasCompletedOnboarding = true
+            onboardingPageIndex = 0
+            applyAccessSnapshot(snapshot, presentingStarterIntro: true)
+        } catch {
+            onboardingCompletionErrorMessage = (error as? LocalizedError)?.errorDescription ??
+                "Could not complete onboarding right now. Please try again."
+        }
+    }
+
+    private func ensureValidSessionForRemoteUse() async throws {
+        guard services.runtimeMode == .remoteAccessState else { return }
+        try await refreshSessionIfNeeded()
+    }
+
+    private func refreshSessionIfNeeded() async throws {
+        guard let session = authSessionStore.currentSession else {
+            throw SupabaseAuthServiceError.unauthorized(message: "Please log in to continue.")
+        }
+
+        if !(session.isExpired || session.isExpiringSoon) {
+            return
+        }
+
+        guard let refreshToken = session.refreshToken, !refreshToken.isEmpty else {
+            throw SupabaseAuthServiceError.unauthorized(message: "Your session expired. Please log in again.")
+        }
+
+        let refreshedSession = try await authService.refreshSession(refreshToken: refreshToken)
+        let mergedSession = StoredAuthSession(
+            accessToken: refreshedSession.accessToken,
+            refreshToken: refreshedSession.refreshToken ?? session.refreshToken,
+            tokenType: refreshedSession.tokenType ?? session.tokenType,
+            expiresAt: refreshedSession.expiresAt,
+            userID: refreshedSession.userID ?? session.userID,
+            userEmail: refreshedSession.userEmail ?? session.userEmail
+        )
+        try authSessionStore.persistSession(mergedSession)
+        authenticatedUserEmail = mergedSession.userEmail ?? authenticatedUserEmail
+    }
+
+    @MainActor
     private func refreshAccessStateFromRemote() async {
         guard services.runtimeMode == .remoteAccessState else { return }
         guard !isRefreshingRemoteAccessState else { return }
@@ -952,8 +1177,27 @@ final class AppState {
         defer { isRefreshingRemoteAccessState = false }
 
         do {
+            try await refreshSessionIfNeeded()
             let snapshot = try await services.accessStateService.getAccessState()
             applyAccessSnapshot(snapshot)
+        } catch let error as RemoteAccessStateServiceError {
+            switch error {
+            case let .unauthorized(message):
+                _ = try? authSessionStore.clearSession()
+                authenticatedUserEmail = nil
+                setMockAccessState(.unauthenticated)
+                authErrorMessage = message
+                phase = .auth
+            default:
+                accessStateLoadErrorMessage = friendlyAccessStateError(for: error)
+                phase = .accessStateError
+            }
+        } catch let error as SupabaseAuthServiceError {
+            _ = try? authSessionStore.clearSession()
+            authenticatedUserEmail = nil
+            setMockAccessState(.unauthenticated)
+            authErrorMessage = error.errorDescription
+            phase = .auth
         } catch {
             accessStateLoadErrorMessage = friendlyAccessStateError(for: error)
             phase = .accessStateError
@@ -961,7 +1205,7 @@ final class AppState {
     }
 
     @MainActor
-    private func applyAccessSnapshot(_ snapshot: AccessStateSnapshot) {
+    private func applyAccessSnapshot(_ snapshot: AccessStateSnapshot, presentingStarterIntro: Bool = false) {
         setMockAccessState(snapshot.state, statusNote: snapshot.statusNote)
 
         if let starterDaysRemaining = snapshot.starterDaysRemaining {
@@ -977,14 +1221,21 @@ final class AppState {
             hasCompletedOnboarding = false
             onboardingPageIndex = 0
             phase = .onboarding
-        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+        case .starter_active:
+            if presentingStarterIntro {
+                hasViewedStarterIntro = false
+                phase = .starterIntro
+            } else {
+                phase = .main
+            }
+        case .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             phase = .main
         case .starter_expired, .trial_not_started, .billing_issue, .trial_expired, .subscription_expired:
             pendingHomeGateState = snapshot.state
             phase = .main
         case .unauthenticated:
-            phase = .welcome
-            accessStatusNote = "Authentication flow is not connected in this mock build."
+            phase = .auth
+            accessStatusNote = "Please log in to continue."
         }
     }
 

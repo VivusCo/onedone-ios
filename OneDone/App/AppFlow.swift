@@ -9,6 +9,8 @@ struct AppFlow: View {
             ODColor.background.ignoresSafeArea()
 
             switch appState.phase {
+            case .auth:
+                AuthView(appState: appState)
             case .welcome:
                 WelcomeView {
                     appState.beginOnboarding()
@@ -20,11 +22,17 @@ struct AppFlow: View {
                     currentStep: appState.onboardingPageIndex,
                     totalSteps: appState.onboardingPages.count,
                     canGoBack: appState.onboardingPageIndex > 0,
+                    isSubmitting: appState.isCompletingOnboarding,
+                    submitErrorMessage: appState.onboardingCompletionErrorMessage,
                     onBack: { appState.previousOnboardingPage() },
-                    onNext: { appState.nextOnboardingPage() }
+                    onNext: {
+                        Task {
+                            await appState.nextOnboardingPage()
+                        }
+                    }
                 )
             case .starterIntro:
-                StarterAccessIntroView {
+                StarterAccessIntroView(showMockNotice: appState.services.runtimeMode == .mock) {
                     appState.enterMainApp()
                 }
             case .access:
@@ -48,7 +56,7 @@ struct AppFlow: View {
         }
         .animation(.easeInOut(duration: 0.25), value: appState.phase)
         .task {
-            await appState.bootstrapAccessStateIfNeeded()
+            await appState.bootstrapAppIfNeeded()
         }
     }
 }

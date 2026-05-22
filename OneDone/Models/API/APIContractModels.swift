@@ -75,6 +75,7 @@ enum AnalyzeTaskResponseType: String, Codable {
     case clarification
     case taskAnalysis = "task_analysis"
     case multiTaskSplitPreview = "multi_task_split_preview"
+    case rateLimited = "rate_limited"
     case retryableError = "retryable_error"
     case accessError = "access_error"
     case paywallError = "paywall_error"

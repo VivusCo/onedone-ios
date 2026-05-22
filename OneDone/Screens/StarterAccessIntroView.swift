@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct StarterAccessIntroView: View {
+    var showMockNotice: Bool = false
     let onContinue: () -> Void
 
     var body: some View {
@@ -17,11 +18,13 @@ struct StarterAccessIntroView: View {
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
 
-                    ODInfoBanner(
-                        title: "Mock prototype",
-                        message: "This version uses local mock state only.",
-                        icon: "checkmark.shield"
-                    )
+                    if showMockNotice {
+                        ODInfoBanner(
+                            title: "Mock prototype",
+                            message: "This version uses local mock state only.",
+                            icon: "checkmark.shield"
+                        )
+                    }
                 }
             }
 
@@ -37,5 +40,5 @@ struct StarterAccessIntroView: View {
 }
 
 #Preview {
-    StarterAccessIntroView(onContinue: {})
+    StarterAccessIntroView(showMockNotice: true, onContinue: {})
 }

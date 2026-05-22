@@ -3,11 +3,38 @@ import Observation
 
 struct SettingsView: View {
     @Bindable var appState: AppState
+    @State private var isLoggingOut: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(title: "Settings", subtitle: "Prototype controls")
+
+                ODCard {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                        Text("Signed in account")
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
+
+                        Text(appState.authenticatedUserEmail ?? "Not signed in")
+                            .font(OneDoneStyle.bodyFont)
+                            .foregroundStyle(ODColor.textSecondary)
+
+                        if appState.services.runtimeMode == .remoteAccessState {
+                            ODSecondaryButton(
+                                title: isLoggingOut ? "Logging out..." : "Log out",
+                                icon: "rectangle.portrait.and.arrow.right",
+                                isDisabled: isLoggingOut
+                            ) {
+                                Task {
+                                    isLoggingOut = true
+                                    await appState.logOut()
+                                    isLoggingOut = false
+                                }
+                            }
+                        }
+                    }
+                }
 
                 ODCard {
                     VStack(alignment: .leading, spacing: 12) {
@@ -36,7 +63,16 @@ struct SettingsView: View {
                         title: "Runtime mode",
                         message: runtimeModeMessage,
                         icon: "internaldrive.fill",
-                        tone: .success
+                        tone: appState.services.runtimeMode == .remoteAccessState ? .success : .warning
+                    )
+                }
+
+                if let accessStatusNote = appState.accessStatusNote {
+                    ODInfoBanner(
+                        title: "Access status",
+                        message: accessStatusNote,
+                        icon: "info.circle.fill",
+                        tone: .neutral
                     )
                 }
             }
@@ -50,9 +86,9 @@ struct SettingsView: View {
     private var runtimeModeMessage: String {
         switch appState.services.runtimeMode {
         case .mock:
-            return "Running in local mock mode. No Supabase, StoreKit, backend, or OpenAI calls are used."
+            return "Running in local mock mode for previews/development fallback."
         case .remoteAccessState:
-            return "Using backend get-access-state and analyze-task when remote mode is enabled. Clarification answers, replies, reminders, and subscription actions remain local mock behavior."
+            return "Remote-first MVP runtime is active (Auth + access state + task APIs)."
         case .remotePlaceholder:
             return "Remote placeholder mode is scaffold-only and not intended for runtime."
         }
