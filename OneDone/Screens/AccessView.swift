@@ -36,7 +36,7 @@ struct AccessView: View {
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        ForEach(MockAccessState.allCases) { state in
+                        ForEach(APIAccessState.allCases) { state in
                             Button {
                                 appState.setMockAccessState(state)
                             } label: {
@@ -101,12 +101,14 @@ struct AccessView: View {
 
     private var accessStatusTone: ODStatusTone {
         switch appState.mockAccessState {
-        case .starter_active, .trial_active, .subscription_active:
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active:
             return .success
-        case .starter_expired, .trial_expired, .subscription_expired:
+        case .grace_period, .starter_expired, .trial_not_started, .trial_expired, .subscription_expired:
             return .warning
         case .billing_issue:
             return .warning
+        case .unauthenticated, .onboarding_required:
+            return .neutral
         }
     }
 }

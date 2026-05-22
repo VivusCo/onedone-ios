@@ -18,6 +18,13 @@ enum APIAccessState: String, Codable, CaseIterable {
 struct APIAccessStatePayload: Codable {
     var accessState: APIAccessState
     var starterDaysRemaining: Int?
+    var statusNote: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessState = "access_state"
+        case starterDaysRemaining = "starter_days_remaining"
+        case statusNote = "status_note"
+    }
 }
 
 struct CompleteOnboardingRequest: Codable {
@@ -30,6 +37,24 @@ struct CompleteOnboardingResponse: Codable {
 
 struct GetAccessStateResponse: Codable {
     var access: APIAccessStatePayload
+}
+
+struct GetAccessStateDTO: Decodable {
+    let access: APIAccessStatePayload
+
+    enum CodingKeys: String, CodingKey {
+        case access
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if container.contains(.access) {
+            access = try container.decode(APIAccessStatePayload.self, forKey: .access)
+        } else {
+            access = try APIAccessStatePayload(from: decoder)
+        }
+    }
 }
 
 struct AnalyzeTaskRequest: Codable {

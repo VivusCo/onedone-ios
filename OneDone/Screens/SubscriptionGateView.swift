@@ -3,7 +3,7 @@ import Observation
 
 struct SubscriptionGateView: View {
     @Bindable var appState: AppState
-    let accessState: MockAccessState
+    let accessState: APIAccessState
     var onActivated: (() -> Void)? = nil
 
     @State private var linkFeedback: String?
@@ -52,7 +52,7 @@ struct SubscriptionGateView: View {
 
     private var headline: String {
         switch accessState {
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             return "Keep using OneDone."
         case .billing_issue:
             return "We couldn't verify billing."
@@ -60,14 +60,18 @@ struct SubscriptionGateView: View {
             return "Your trial has ended."
         case .subscription_expired:
             return "Your subscription has ended."
-        case .starter_active, .trial_active, .subscription_active:
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             return "Access active"
+        case .onboarding_required:
+            return "Finish onboarding"
+        case .unauthenticated:
+            return "Sign in required"
         }
     }
 
     private var subtext: String {
         switch accessState {
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             return "Your Starter Access has ended. Start your 14-day App Store trial to keep using task breakdowns, replies, reminders, and follow-ups."
         case .billing_issue:
             return "Creation is temporarily locked in this mock billing issue state. Resolve billing to continue creating new tasks."
@@ -75,30 +79,40 @@ struct SubscriptionGateView: View {
             return "Your mock trial has ended. Start a subscription to continue creating new tasks."
         case .subscription_expired:
             return "Your mock subscription has ended. Renew to continue creating new tasks."
-        case .starter_active, .trial_active, .subscription_active:
-            return "Your access is active."
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            return appState.accessStatusNote ?? "Your access is active."
+        case .onboarding_required:
+            return "Complete onboarding to unlock Starter Access."
+        case .unauthenticated:
+            return "Authentication is required before using OneDone."
         }
     }
 
     private var ctaTitle: String {
         switch accessState {
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             return "Start 14-day trial"
         case .trial_expired, .subscription_expired, .billing_issue:
             return "Activate subscription (mock)"
-        case .starter_active, .trial_active, .subscription_active:
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             return "Access active"
+        case .onboarding_required:
+            return "Continue onboarding"
+        case .unauthenticated:
+            return "Sign in required"
         }
     }
 
     private var isCTAButtonDisabled: Bool {
         switch accessState {
-        case .starter_active, .trial_active, .subscription_active:
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             return true
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             return !appState.isTrialEligible
         case .billing_issue, .trial_expired, .subscription_expired:
             return false
+        case .onboarding_required, .unauthenticated:
+            return true
         }
     }
 
@@ -130,7 +144,7 @@ struct SubscriptionGateView: View {
 
     private func handleCTAAction() {
         switch accessState {
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             appState.activateAppStoreTrial()
             if appState.canCreateNewTasks {
                 onActivated?()
@@ -140,7 +154,9 @@ struct SubscriptionGateView: View {
         case .billing_issue, .trial_expired, .subscription_expired:
             appState.activateMockSubscription()
             onActivated?()
-        case .starter_active, .trial_active, .subscription_active:
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            break
+        case .onboarding_required, .unauthenticated:
             break
         }
     }
@@ -151,10 +167,12 @@ struct SubscriptionGateView: View {
             appState.activateMockSubscription()
             linkFeedback = "Mock restore completed. Subscription is now active."
             onActivated?()
-        case .starter_expired:
+        case .starter_expired, .trial_not_started:
             linkFeedback = "No purchases to restore yet in this mock Starter state."
-        case .starter_active, .trial_active, .subscription_active:
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             linkFeedback = "Access is already active."
+        case .onboarding_required, .unauthenticated:
+            linkFeedback = "Restore is unavailable until authentication and onboarding are complete."
         }
     }
 }

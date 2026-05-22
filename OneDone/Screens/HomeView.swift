@@ -28,6 +28,15 @@ struct HomeView: View {
                     tone: accessIndicatorTone
                 )
 
+                if let accessStatusNote = appState.accessStatusNote {
+                    ODInfoBanner(
+                        title: "Access update",
+                        message: accessStatusNote,
+                        icon: "info.circle.fill",
+                        tone: accessStatusNoteTone
+                    )
+                }
+
                 mainInputCard
 
                 if appState.showsAccessGateForCreation {
@@ -67,6 +76,11 @@ struct HomeView: View {
                 accessState: appState.mockAccessState
             ) {
                 showSubscriptionGate = false
+            }
+        }
+        .onAppear {
+            if appState.consumePendingHomeGateState() != nil {
+                showSubscriptionGate = true
             }
         }
         .oneDoneScreen()
@@ -216,12 +230,22 @@ struct HomeView: View {
 
     private var accessIndicatorTitle: String {
         switch appState.mockAccessState {
+        case .unauthenticated:
+            return "Sign in required"
+        case .onboarding_required:
+            return "Onboarding required"
         case .starter_active:
             return "Starter: \(appState.starterDaysRemaining) days left"
+        case .trial_not_started:
+            return "Trial not started"
         case .trial_active:
             return "Trial active"
         case .subscription_active:
             return "Subscription active"
+        case .subscription_cancelled_active:
+            return "Subscription active (canceled)"
+        case .grace_period:
+            return "Billing grace period"
         case .starter_expired:
             return "Starter expired"
         case .billing_issue:
@@ -237,10 +261,21 @@ struct HomeView: View {
         switch appState.mockAccessState {
         case .starter_active:
             return .highlight
-        case .trial_active, .subscription_active:
+        case .trial_active, .subscription_active, .subscription_cancelled_active:
             return .success
-        case .starter_expired, .billing_issue, .trial_expired, .subscription_expired:
+        case .grace_period, .starter_expired, .trial_not_started, .billing_issue, .trial_expired, .subscription_expired:
             return .warning
+        case .unauthenticated, .onboarding_required:
+            return .neutral
+        }
+    }
+
+    private var accessStatusNoteTone: ODStatusTone {
+        switch appState.mockAccessState {
+        case .grace_period, .billing_issue:
+            return .warning
+        default:
+            return .neutral
         }
     }
 }

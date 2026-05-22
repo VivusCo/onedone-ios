@@ -11,20 +11,45 @@ enum ServiceScaffoldError: LocalizedError {
     }
 }
 
+enum ServiceRuntimeMode {
+    case mock
+    case remoteAccessState
+    case remotePlaceholder
+}
+
 struct AppServiceContainer {
+    var runtimeMode: ServiceRuntimeMode
     var accessStateService: any AccessStateServiceProtocol
     var taskService: any TaskServiceProtocol
     var reminderService: any ReminderServiceProtocol
     var subscriptionService: any SubscriptionServiceProtocol
 
     static let mock = AppServiceContainer(
+        runtimeMode: .mock,
         accessStateService: MockAccessStateService(),
         taskService: MockTaskService(),
         reminderService: MockReminderService(),
         subscriptionService: MockSubscriptionService()
     )
 
+    static func remoteAccessState(
+        environment: APIEnvironment,
+        tokenProvider: any AuthTokenProvider = NoAuthTokenProvider()
+    ) -> AppServiceContainer {
+        AppServiceContainer(
+            runtimeMode: .remoteAccessState,
+            accessStateService: RemoteAccessStateService(
+                environment: environment,
+                tokenProvider: tokenProvider
+            ),
+            taskService: MockTaskService(),
+            reminderService: MockReminderService(),
+            subscriptionService: MockSubscriptionService()
+        )
+    }
+
     static let remotePlaceholder = AppServiceContainer(
+        runtimeMode: .remotePlaceholder,
         accessStateService: RemoteAccessStateService(),
         taskService: RemoteTaskService(),
         reminderService: RemoteReminderService(),
