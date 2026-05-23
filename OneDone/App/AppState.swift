@@ -94,6 +94,19 @@ struct ReminderActionFeedback {
     let message: String
 }
 
+enum SubscriptionGateFeedbackKind {
+    case success
+    case info
+    case warning
+    case requiresLogin
+}
+
+struct SubscriptionGateFeedback {
+    let kind: SubscriptionGateFeedbackKind
+    let message: String
+    let shouldCloseGate: Bool
+}
+
 enum NewTaskAnalysisResult {
     case clarification(TaskDraft)
     case taskAnalysis(MockTask)
@@ -413,6 +426,239 @@ final class AppState {
         services.runtimeMode == .remoteAccessState &&
             !forceMockTaskFlowInSession &&
             authSessionStore.currentSession != nil
+    }
+
+    var shouldUseRemoteSubscriptionFlow: Bool {
+        services.runtimeMode == .remoteAccessState && !forceMockTaskFlowInSession
+    }
+
+    @MainActor
+    func startSubscriptionFromGate(accessState: APIAccessState) async -> SubscriptionGateFeedback {
+        guard shouldUseRemoteSubscriptionFlow else {
+            switch accessState {
+            case .starter_expired, .trial_not_started:
+                activateAppStoreTrial()
+                if canCreateNewTasks {
+                    return SubscriptionGateFeedback(
+                        kind: .success,
+                        message: "Mock trial activated.",
+                        shouldCloseGate: true
+                    )
+                }
+
+                return SubscriptionGateFeedback(
+                    kind: .warning,
+                    message: "Starter Access must be completed before trial activation.",
+                    shouldCloseGate: false
+                )
+            case .billing_issue, .trial_expired, .subscription_expired:
+                activateMockSubscription()
+                return SubscriptionGateFeedback(
+                    kind: .success,
+                    message: "Mock subscription activated.",
+                    shouldCloseGate: true
+                )
+            case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Access is already active.",
+                    shouldCloseGate: false
+                )
+            case .onboarding_required:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Complete onboarding first.",
+                    shouldCloseGate: false
+                )
+            case .unauthenticated:
+                return SubscriptionGateFeedback(
+                    kind: .requiresLogin,
+                    message: "Please sign in to continue.",
+                    shouldCloseGate: false
+                )
+            }
+        }
+
+        guard authSessionStore.currentSession != nil else {
+            authErrorMessage = "Your session expired. Please log in again."
+            phase = .auth
+            return SubscriptionGateFeedback(
+                kind: .requiresLogin,
+                message: "Please log in again to start your trial.",
+                shouldCloseGate: false
+            )
+        }
+
+        do {
+            try await ensureValidSessionForRemoteUse()
+            let purchaseResult = try await services.subscriptionService.startSubscriptionPurchase()
+
+            switch purchaseResult {
+            case .cancelled:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Purchase was canceled. You can try again anytime.",
+                    shouldCloseGate: false
+                )
+            case .pending:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Purchase is pending approval. Please check again shortly.",
+                    shouldCloseGate: false
+                )
+            case .purchased:
+                try await refreshAccessStateAfterSubscriptionSync()
+                if isActiveAccessState(mockAccessState) {
+                    return SubscriptionGateFeedback(
+                        kind: .success,
+                        message: "Access is active. You can continue in OneDone.",
+                        shouldCloseGate: true
+                    )
+                }
+
+                return SubscriptionGateFeedback(
+                    kind: .warning,
+                    message: "Purchase was received, but access is still updating. Pull to refresh and try again.",
+                    shouldCloseGate: false
+                )
+            }
+        } catch let error as SubscriptionServiceError {
+            if case .authenticationRequired = error {
+                authErrorMessage = "Your session expired. Please log in again."
+                phase = .auth
+                return SubscriptionGateFeedback(
+                    kind: .requiresLogin,
+                    message: "Please log in again to continue.",
+                    shouldCloseGate: false
+                )
+            }
+
+            return SubscriptionGateFeedback(
+                kind: .warning,
+                message: error.errorDescription ?? "Could not complete subscription right now. Please try again.",
+                shouldCloseGate: false
+            )
+        } catch let error as SupabaseAuthServiceError {
+            authErrorMessage = error.errorDescription
+            phase = .auth
+            return SubscriptionGateFeedback(
+                kind: .requiresLogin,
+                message: error.errorDescription ?? "Please log in again to continue.",
+                shouldCloseGate: false
+            )
+        } catch {
+            return SubscriptionGateFeedback(
+                kind: .warning,
+                message: "Could not complete subscription right now. Please try again.",
+                shouldCloseGate: false
+            )
+        }
+    }
+
+    @MainActor
+    func restorePurchasesFromGate(accessState: APIAccessState) async -> SubscriptionGateFeedback {
+        guard shouldUseRemoteSubscriptionFlow else {
+            switch accessState {
+            case .trial_expired, .subscription_expired, .billing_issue:
+                activateMockSubscription()
+                return SubscriptionGateFeedback(
+                    kind: .success,
+                    message: "Mock restore completed. Subscription is now active.",
+                    shouldCloseGate: true
+                )
+            case .starter_expired, .trial_not_started:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "No purchases to restore in this mock Starter state.",
+                    shouldCloseGate: false
+                )
+            case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Access is already active.",
+                    shouldCloseGate: false
+                )
+            case .onboarding_required:
+                return SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Complete onboarding first.",
+                    shouldCloseGate: false
+                )
+            case .unauthenticated:
+                return SubscriptionGateFeedback(
+                    kind: .requiresLogin,
+                    message: "Please sign in to continue.",
+                    shouldCloseGate: false
+                )
+            }
+        }
+
+        guard authSessionStore.currentSession != nil else {
+            authErrorMessage = "Your session expired. Please log in again."
+            phase = .auth
+            return SubscriptionGateFeedback(
+                kind: .requiresLogin,
+                message: "Please log in again to restore purchases.",
+                shouldCloseGate: false
+            )
+        }
+
+        do {
+            try await ensureValidSessionForRemoteUse()
+            let restoreResult = try await services.subscriptionService.restorePurchases()
+            try await refreshAccessStateAfterSubscriptionSync()
+
+            if isActiveAccessState(mockAccessState) {
+                let successMessage: String
+                if restoreResult.restoredEntitlementCount > 0 {
+                    successMessage = "Purchases restored. Access is active."
+                } else {
+                    successMessage = "Restore completed and access was refreshed."
+                }
+
+                return SubscriptionGateFeedback(
+                    kind: .success,
+                    message: successMessage,
+                    shouldCloseGate: true
+                )
+            }
+
+            return SubscriptionGateFeedback(
+                kind: .warning,
+                message: "Restore completed, but access is still locked. Please try again shortly.",
+                shouldCloseGate: false
+            )
+        } catch let error as SubscriptionServiceError {
+            if case .authenticationRequired = error {
+                authErrorMessage = "Your session expired. Please log in again."
+                phase = .auth
+                return SubscriptionGateFeedback(
+                    kind: .requiresLogin,
+                    message: "Please log in again to continue.",
+                    shouldCloseGate: false
+                )
+            }
+
+            return SubscriptionGateFeedback(
+                kind: .warning,
+                message: error.errorDescription ?? "Could not restore purchases right now. Please try again.",
+                shouldCloseGate: false
+            )
+        } catch let error as SupabaseAuthServiceError {
+            authErrorMessage = error.errorDescription
+            phase = .auth
+            return SubscriptionGateFeedback(
+                kind: .requiresLogin,
+                message: error.errorDescription ?? "Please log in again to continue.",
+                shouldCloseGate: false
+            )
+        } catch {
+            return SubscriptionGateFeedback(
+                kind: .warning,
+                message: "Could not restore purchases right now. Please try again.",
+                shouldCloseGate: false
+            )
+        }
     }
 
     func makeDraft(prompt: String, template: TaskTemplate?) -> TaskDraft {
@@ -1329,6 +1575,29 @@ final class AppState {
     }
 
     @MainActor
+    private func refreshAccessStateAfterSubscriptionSync() async throws {
+        guard services.runtimeMode == .remoteAccessState else { return }
+
+        do {
+            try await refreshSessionIfNeeded()
+            let snapshot = try await services.accessStateService.getAccessState()
+            applyAccessSnapshot(snapshot)
+        } catch let error as RemoteAccessStateServiceError {
+            switch error {
+            case let .unauthorized(message):
+                _ = try? authSessionStore.clearSession()
+                authenticatedUserEmail = nil
+                setMockAccessState(.unauthenticated)
+                authErrorMessage = message
+                phase = .auth
+                throw SupabaseAuthServiceError.unauthorized(message: message)
+            default:
+                throw error
+            }
+        }
+    }
+
+    @MainActor
     private func applyAccessSnapshot(_ snapshot: AccessStateSnapshot, presentingStarterIntro: Bool = false) {
         setMockAccessState(snapshot.state, statusNote: snapshot.statusNote)
 
@@ -1375,6 +1644,15 @@ final class AppState {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "New task" }
         return String(trimmed.prefix(36))
+    }
+
+    private func isActiveAccessState(_ state: APIAccessState) -> Bool {
+        switch state {
+        case .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            return true
+        default:
+            return false
+        }
     }
 
     private func firstNonEmpty(_ values: String?...) -> String {

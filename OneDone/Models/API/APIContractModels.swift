@@ -597,14 +597,98 @@ struct GenerateReplyResponse: Decodable {
 
 struct ValidateSubscriptionRequest: Codable {
     var transactionID: String
+    var originalTransactionID: String?
+    var productID: String?
+    var purchaseDateISO8601: String?
+    var expiresDateISO8601: String?
+    var revocationDateISO8601: String?
+    var environment: String?
+    var storefront: String?
+
+    enum CodingKeys: String, CodingKey {
+        case transactionID = "transaction_id"
+        case originalTransactionID = "original_transaction_id"
+        case productID = "product_id"
+        case purchaseDateISO8601 = "purchase_date"
+        case expiresDateISO8601 = "expires_date"
+        case revocationDateISO8601 = "revocation_date"
+        case environment
+        case storefront
+    }
 }
 
-struct ValidateSubscriptionResponse: Codable {
+struct ValidateSubscriptionResponse: Decodable {
     var access: APIAccessStatePayload
+
+    enum CodingKeys: String, CodingKey {
+        case access
+    }
+
+    init(access: APIAccessStatePayload) {
+        self.access = access
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if container.contains(.access) {
+            access = try container.decode(APIAccessStatePayload.self, forKey: .access)
+        } else {
+            access = try APIAccessStatePayload(from: decoder)
+        }
+    }
 }
 
-struct RestorePurchasesResponse: Codable {
+struct RestorePurchasesRequest: Codable {
+    var entitlements: [RestorePurchaseEntitlement]?
+
+    enum CodingKeys: String, CodingKey {
+        case entitlements
+    }
+}
+
+struct RestorePurchaseEntitlement: Codable {
+    var transactionID: String
+    var originalTransactionID: String?
+    var productID: String?
+    var purchaseDateISO8601: String?
+    var expiresDateISO8601: String?
+    var revocationDateISO8601: String?
+    var environment: String?
+    var storefront: String?
+
+    enum CodingKeys: String, CodingKey {
+        case transactionID = "transaction_id"
+        case originalTransactionID = "original_transaction_id"
+        case productID = "product_id"
+        case purchaseDateISO8601 = "purchase_date"
+        case expiresDateISO8601 = "expires_date"
+        case revocationDateISO8601 = "revocation_date"
+        case environment
+        case storefront
+    }
+}
+
+struct RestorePurchasesResponse: Decodable {
     var access: APIAccessStatePayload
+
+    enum CodingKeys: String, CodingKey {
+        case access
+    }
+
+    init(access: APIAccessStatePayload) {
+        self.access = access
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if container.contains(.access) {
+            access = try container.decode(APIAccessStatePayload.self, forKey: .access)
+        } else {
+            access = try APIAccessStatePayload(from: decoder)
+        }
+    }
 }
 
 struct MessageMarkedSentRequest: Codable {

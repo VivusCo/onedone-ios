@@ -6,7 +6,8 @@ struct SubscriptionGateView: View {
     let accessState: APIAccessState
     var onActivated: (() -> Void)? = nil
 
-    @State private var linkFeedback: String?
+    @State private var linkFeedback: SubscriptionGateFeedback?
+    @State private var isProcessing: Bool = false
 
     var body: some View {
         ScrollView {
@@ -27,19 +28,31 @@ struct SubscriptionGateView: View {
                 ODPrimaryButton(
                     title: ctaTitle,
                     icon: "sparkles",
-                    isDisabled: isCTAButtonDisabled
+                    isDisabled: isCTAButtonDisabled || isProcessing
                 ) {
-                    handleCTAAction()
+                    Task {
+                        await handleCTAAction()
+                    }
                 }
 
                 secondaryLinks
 
+                if isProcessing {
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ProgressView()
+                            .tint(ODColor.primary)
+                        Text("Processing...")
+                            .font(OneDoneStyle.subheadlineFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                }
+
                 if let linkFeedback {
                     ODInfoBanner(
-                        title: "Mock action",
-                        message: linkFeedback,
-                        icon: "info.circle.fill",
-                        tone: .neutral
+                        title: feedbackTitle(for: linkFeedback.kind),
+                        message: linkFeedback.message,
+                        icon: feedbackIcon(for: linkFeedback.kind),
+                        tone: feedbackTone(for: linkFeedback.kind)
                     )
                 }
             }
@@ -76,9 +89,9 @@ struct SubscriptionGateView: View {
         case .billing_issue:
             return "Creation is temporarily locked in this mock billing issue state. Resolve billing to continue creating new tasks."
         case .trial_expired:
-            return "Your mock trial has ended. Start a subscription to continue creating new tasks."
+            return "Your trial has ended. Start your App Store subscription to continue creating new tasks."
         case .subscription_expired:
-            return "Your mock subscription has ended. Renew to continue creating new tasks."
+            return "Your subscription has ended. Renew access to continue creating new tasks."
         case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             return appState.accessStatusNote ?? "Your access is active."
         case .onboarding_required:
@@ -93,7 +106,7 @@ struct SubscriptionGateView: View {
         case .starter_expired, .trial_not_started:
             return "Start 14-day trial"
         case .trial_expired, .subscription_expired, .billing_issue:
-            return "Activate subscription (mock)"
+            return "Start 14-day trial"
         case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             return "Access active"
         case .onboarding_required:
@@ -104,6 +117,17 @@ struct SubscriptionGateView: View {
     }
 
     private var isCTAButtonDisabled: Bool {
+        if appState.shouldUseRemoteSubscriptionFlow {
+            switch accessState {
+            case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+                return true
+            case .starter_expired, .trial_not_started, .billing_issue, .trial_expired, .subscription_expired:
+                return false
+            case .onboarding_required, .unauthenticated:
+                return true
+            }
+        }
+
         switch accessState {
         case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
             return true
@@ -118,61 +142,103 @@ struct SubscriptionGateView: View {
 
     private var secondaryLinks: some View {
         VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-            Text("Restore Purchases")
-                .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                .foregroundStyle(ODColor.primary)
-                .onTapGesture {
-                    handleRestorePurchases()
+            Button {
+                Task {
+                    await handleRestorePurchases()
                 }
+            } label: {
+                Text("Restore Purchases")
+                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                    .foregroundStyle(ODColor.primary)
+            }
+            .buttonStyle(.plain)
+            .disabled(isProcessing)
 
             Text("Terms of Use")
                 .font(OneDoneStyle.subheadlineFont.weight(.semibold))
                 .foregroundStyle(ODColor.primary)
                 .onTapGesture {
-                    linkFeedback = "Terms of Use is a mock link in this prototype."
+                    linkFeedback = SubscriptionGateFeedback(
+                        kind: .info,
+                        message: "Terms of Use is a placeholder link in this prototype.",
+                        shouldCloseGate: false
+                    )
                 }
 
             Text("Privacy Policy")
                 .font(OneDoneStyle.subheadlineFont.weight(.semibold))
                 .foregroundStyle(ODColor.primary)
                 .onTapGesture {
-                    linkFeedback = "Privacy Policy is a mock link in this prototype."
+                    linkFeedback = SubscriptionGateFeedback(
+                        kind: .info,
+                        message: "Privacy Policy is a placeholder link in this prototype.",
+                        shouldCloseGate: false
+                    )
                 }
         }
         .padding(.top, 4)
     }
 
-    private func handleCTAAction() {
-        switch accessState {
-        case .starter_expired, .trial_not_started:
-            appState.activateAppStoreTrial()
-            if appState.canCreateNewTasks {
-                onActivated?()
-            } else {
-                linkFeedback = "Starter Access must be fully completed before trial activation."
-            }
-        case .billing_issue, .trial_expired, .subscription_expired:
-            appState.activateMockSubscription()
+    @MainActor
+    private func handleCTAAction() async {
+        guard !isProcessing else { return }
+        isProcessing = true
+        defer { isProcessing = false }
+
+        let feedback = await appState.startSubscriptionFromGate(accessState: accessState)
+        linkFeedback = feedback
+        if feedback.shouldCloseGate {
             onActivated?()
-        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
-            break
-        case .onboarding_required, .unauthenticated:
-            break
         }
     }
 
-    private func handleRestorePurchases() {
-        switch accessState {
-        case .trial_expired, .subscription_expired, .billing_issue:
-            appState.activateMockSubscription()
-            linkFeedback = "Mock restore completed. Subscription is now active."
+    @MainActor
+    private func handleRestorePurchases() async {
+        guard !isProcessing else { return }
+        isProcessing = true
+        defer { isProcessing = false }
+
+        let feedback = await appState.restorePurchasesFromGate(accessState: accessState)
+        linkFeedback = feedback
+        if feedback.shouldCloseGate {
             onActivated?()
-        case .starter_expired, .trial_not_started:
-            linkFeedback = "No purchases to restore yet in this mock Starter state."
-        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
-            linkFeedback = "Access is already active."
-        case .onboarding_required, .unauthenticated:
-            linkFeedback = "Restore is unavailable until authentication and onboarding are complete."
+        }
+    }
+
+    private func feedbackTitle(for kind: SubscriptionGateFeedbackKind) -> String {
+        switch kind {
+        case .success:
+            return "Access updated"
+        case .info:
+            return "Update"
+        case .warning:
+            return "Could not complete action"
+        case .requiresLogin:
+            return "Login required"
+        }
+    }
+
+    private func feedbackIcon(for kind: SubscriptionGateFeedbackKind) -> String {
+        switch kind {
+        case .success:
+            return "checkmark.circle.fill"
+        case .info:
+            return "info.circle.fill"
+        case .warning:
+            return "exclamationmark.triangle.fill"
+        case .requiresLogin:
+            return "person.crop.circle.badge.exclamationmark"
+        }
+    }
+
+    private func feedbackTone(for kind: SubscriptionGateFeedbackKind) -> ODStatusTone {
+        switch kind {
+        case .success:
+            return .success
+        case .info:
+            return .neutral
+        case .warning, .requiresLogin:
+            return .warning
         }
     }
 }
