@@ -599,9 +599,14 @@ struct ValidateSubscriptionRequest: Codable {
     var transactionID: String
     var originalTransactionID: String?
     var productID: String?
-    var purchaseDateISO8601: String?
-    var expiresDateISO8601: String?
+    var purchasedAtISO8601: String?
+    var expiresAtISO8601: String?
+    var ownershipType: String?
     var revocationDateISO8601: String?
+    var entitlementStatus: String?
+    var storeKitStatus: String?
+    var source: String?
+    var platform: String?
     var environment: String?
     var storefront: String?
 
@@ -609,9 +614,14 @@ struct ValidateSubscriptionRequest: Codable {
         case transactionID = "transaction_id"
         case originalTransactionID = "original_transaction_id"
         case productID = "product_id"
-        case purchaseDateISO8601 = "purchase_date"
-        case expiresDateISO8601 = "expires_date"
+        case purchasedAtISO8601 = "purchased_at"
+        case expiresAtISO8601 = "expires_at"
+        case ownershipType = "ownership_type"
         case revocationDateISO8601 = "revocation_date"
+        case entitlementStatus = "entitlement_status"
+        case storeKitStatus = "storekit_status"
+        case source
+        case platform
         case environment
         case storefront
     }
@@ -651,9 +661,14 @@ struct RestorePurchaseEntitlement: Codable {
     var transactionID: String
     var originalTransactionID: String?
     var productID: String?
-    var purchaseDateISO8601: String?
-    var expiresDateISO8601: String?
+    var purchasedAtISO8601: String?
+    var expiresAtISO8601: String?
+    var ownershipType: String?
     var revocationDateISO8601: String?
+    var entitlementStatus: String?
+    var storeKitStatus: String?
+    var source: String?
+    var platform: String?
     var environment: String?
     var storefront: String?
 
@@ -661,9 +676,14 @@ struct RestorePurchaseEntitlement: Codable {
         case transactionID = "transaction_id"
         case originalTransactionID = "original_transaction_id"
         case productID = "product_id"
-        case purchaseDateISO8601 = "purchase_date"
-        case expiresDateISO8601 = "expires_date"
+        case purchasedAtISO8601 = "purchased_at"
+        case expiresAtISO8601 = "expires_at"
+        case ownershipType = "ownership_type"
         case revocationDateISO8601 = "revocation_date"
+        case entitlementStatus = "entitlement_status"
+        case storeKitStatus = "storekit_status"
+        case source
+        case platform
         case environment
         case storefront
     }

@@ -141,9 +141,14 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             transactionID: String(transaction.id),
             originalTransactionID: String(transaction.originalID),
             productID: transaction.productID,
-            purchaseDateISO8601: ISO8601DateFormatter().string(from: transaction.purchaseDate),
-            expiresDateISO8601: transaction.expirationDate.map { ISO8601DateFormatter().string(from: $0) },
+            purchasedAtISO8601: ISO8601DateFormatter().string(from: transaction.purchaseDate),
+            expiresAtISO8601: transaction.expirationDate.map { ISO8601DateFormatter().string(from: $0) },
+            ownershipType: transaction.ownershipType.rawValue,
             revocationDateISO8601: transaction.revocationDate.map { ISO8601DateFormatter().string(from: $0) },
+            entitlementStatus: entitlementStatus(from: transaction),
+            storeKitStatus: entitlementStatus(from: transaction),
+            source: "app_store",
+            platform: "ios",
             environment: environmentLabel(from: transaction),
             storefront: nil
         )
@@ -154,9 +159,14 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             transactionID: String(transaction.id),
             originalTransactionID: String(transaction.originalID),
             productID: transaction.productID,
-            purchaseDateISO8601: ISO8601DateFormatter().string(from: transaction.purchaseDate),
-            expiresDateISO8601: transaction.expirationDate.map { ISO8601DateFormatter().string(from: $0) },
+            purchasedAtISO8601: ISO8601DateFormatter().string(from: transaction.purchaseDate),
+            expiresAtISO8601: transaction.expirationDate.map { ISO8601DateFormatter().string(from: $0) },
+            ownershipType: transaction.ownershipType.rawValue,
             revocationDateISO8601: transaction.revocationDate.map { ISO8601DateFormatter().string(from: $0) },
+            entitlementStatus: entitlementStatus(from: transaction),
+            storeKitStatus: entitlementStatus(from: transaction),
+            source: "app_store",
+            platform: "ios",
             environment: environmentLabel(from: transaction),
             storefront: nil
         )
@@ -214,14 +224,26 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 
             if httpResponse.statusCode == 408 || httpResponse.statusCode == 409 || httpResponse.statusCode == 425 ||
                 httpResponse.statusCode == 429 || httpResponse.statusCode >= 500 {
-                logSubscriptionHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
-                let message = decodeErrorMessage(data) ?? "Subscription request failed. Please try again."
+                let backendError = decodeBackendError(data)
+                logSubscriptionHTTPFailure(
+                    endpoint: endpoint,
+                    statusCode: httpResponse.statusCode,
+                    backendError: backendError,
+                    data: data
+                )
+                let message = sanitizeBackendMessage(backendError?.message) ?? "Subscription request failed. Please try again."
                 throw SubscriptionServiceError.retryable(message: message)
             }
 
             guard (200...299).contains(httpResponse.statusCode) else {
-                logSubscriptionHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
-                let message = decodeErrorMessage(data) ?? "Subscription request failed. Please try again."
+                let backendError = decodeBackendError(data)
+                logSubscriptionHTTPFailure(
+                    endpoint: endpoint,
+                    statusCode: httpResponse.statusCode,
+                    backendError: backendError,
+                    data: data
+                )
+                let message = sanitizeBackendMessage(backendError?.message) ?? "Subscription request failed. Please try again."
                 if endpoint == "validate-subscription" {
                     throw SubscriptionServiceError.backendValidationFailed(message: message)
                 } else {
@@ -246,35 +268,6 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         }
     }
 
-    private func decodeErrorMessage(_ data: Data) -> String? {
-        struct NestedErrorPayload: Decodable {
-            struct NestedError: Decodable {
-                let code: String?
-                let message: String?
-            }
-
-            let ok: Bool?
-            let error: NestedError?
-            let message: String?
-            let detail: String?
-            let errorMessage: String?
-
-            enum CodingKeys: String, CodingKey {
-                case ok
-                case error
-                case message
-                case detail
-                case errorMessage = "error_message"
-            }
-        }
-
-        if let payload = try? JSONDecoder().decode(NestedErrorPayload.self, from: data) {
-            return sanitizeBackendMessage(payload.error?.message ?? payload.errorMessage ?? payload.message ?? payload.detail)
-        }
-
-        return nil
-    }
-
     private func sanitizeBackendMessage(_ message: String?) -> String? {
         guard let message else { return nil }
         let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -287,6 +280,14 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 
         if normalized.contains("rate limit") || normalized.contains("too many requests") {
             return "Too many requests right now. Please try again in a moment."
+        }
+
+        if normalized.contains("product") && normalized.contains("missing") {
+            return "Subscription product details were incomplete. Please try again."
+        }
+
+        if normalized.contains("transaction") && normalized.contains("missing") {
+            return "Subscription transaction details were incomplete. Please try again."
         }
 
         if normalized.contains("not found") {
@@ -340,11 +341,30 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         return functionBaseURL.appendingPathComponent(cleanedEndpoint)
     }
 
-    private func logSubscriptionHTTPFailure(endpoint: String, statusCode: Int, data: Data) {
+    private func entitlementStatus(from transaction: Transaction) -> String {
+        if transaction.revocationDate != nil {
+            return "revoked"
+        }
+
+        if let expirationDate = transaction.expirationDate, expirationDate < Date() {
+            return "expired"
+        }
+
+        return "active"
+    }
+
+    private func logSubscriptionHTTPFailure(
+        endpoint: String,
+        statusCode: Int,
+        backendError: ParsedBackendError?,
+        data: Data
+    ) {
 #if DEBUG
         let keys = topLevelJSONKeys(from: data)
         let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        print("[OneDone][Subscription] endpoint=\(endpoint) status=\(statusCode) keys=\(keysDescription)")
+        let codeValue = backendError?.code ?? "none"
+        let messageValue = backendError?.message ?? "none"
+        print("[OneDone][Subscription] endpoint=\(endpoint) status=\(statusCode) code=\(codeValue) message=\(messageValue) keys=\(keysDescription)")
 #endif
     }
 
@@ -356,6 +376,30 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 
         return dictionary.keys.sorted()
     }
+
+    private func decodeBackendError(_ data: Data) -> ParsedBackendError? {
+        if let payload = try? JSONDecoder().decode(StructuredBackendErrorPayload.self, from: data) {
+            let code = payload.error?.code ?? payload.code ?? payload.status
+            let message = payload.error?.message ?? payload.errorMessage ?? payload.message ?? payload.detail
+            if code != nil || message != nil {
+                return ParsedBackendError(code: code, message: message)
+            }
+        }
+
+        if let object = try? JSONSerialization.jsonObject(with: data),
+           let dictionary = object as? [String: Any] {
+            let code = (dictionary["code"] as? String) ?? (dictionary["status"] as? String)
+            let message =
+                (dictionary["message"] as? String) ??
+                (dictionary["error_message"] as? String) ??
+                (dictionary["detail"] as? String)
+            if code != nil || message != nil {
+                return ParsedBackendError(code: code, message: message)
+            }
+        }
+
+        return nil
+    }
 }
 
 private struct RemoteSubscriptionResponseWrapper<T: Decodable>: Decodable {
@@ -363,4 +407,34 @@ private struct RemoteSubscriptionResponseWrapper<T: Decodable>: Decodable {
     let result: T?
     let response: T?
     let payload: T?
+}
+
+private struct ParsedBackendError {
+    let code: String?
+    let message: String?
+}
+
+private struct StructuredBackendErrorPayload: Decodable {
+    struct NestedError: Decodable {
+        let code: String?
+        let message: String?
+    }
+
+    let ok: Bool?
+    let error: NestedError?
+    let code: String?
+    let status: String?
+    let message: String?
+    let detail: String?
+    let errorMessage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case ok
+        case error
+        case code
+        case status
+        case message
+        case detail
+        case errorMessage = "error_message"
+    }
 }
