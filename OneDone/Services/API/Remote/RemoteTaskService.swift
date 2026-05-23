@@ -35,11 +35,11 @@ struct RemoteTaskService: TaskServiceProtocol {
             throw AnalyzeTaskServiceError.remoteAnalyzeDisabled
         }
 
-        guard let baseURL = environment.baseURL else {
+        guard let url = edgeFunctionURL(endpoint: "analyze-task", queryItems: []) else {
             throw AnalyzeTaskServiceError.missingBaseURL
         }
 
-        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("analyze-task"))
+        var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -66,6 +66,12 @@ struct RemoteTaskService: TaskServiceProtocol {
             if isAccessStatus(statusCode) {
                 let message = payloadMessage(payload) ?? "Your current access does not allow creating new tasks."
                 throw AnalyzeTaskServiceError.accessDenied(message: message)
+            }
+
+            if statusCode == 404 {
+                throw AnalyzeTaskServiceError.retryable(
+                    message: missingFunctionDeploymentMessage(endpoint: "analyze-task")
+                )
             }
 
             if isRateLimitedStatus(statusCode) {
@@ -103,12 +109,15 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         let data = try await postEdgeFunction(
-            path: "functions/v1/answer-clarification",
+            endpoint: "answer-clarification",
             body: request,
             idempotencyKey: idempotencyKey
         )
 
         guard let payload = decodeAnalyzePayload(from: data) else {
+            if let embeddedError = classifyActionPayloadError(data) {
+                throw embeddedError
+            }
             throw TaskActionServiceError.invalidResponse
         }
 
@@ -160,13 +169,17 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         let data = try await postEdgeFunction(
-            path: "functions/v1/generate-reply",
+            endpoint: "generate-reply",
             body: request,
             idempotencyKey: idempotencyKey
         )
 
         if let payload = decodeSingleWrapper(data, as: GenerateReplyResponse.self) {
             return payload
+        }
+
+        if let embeddedError = classifyActionPayloadError(data) {
+            throw embeddedError
         }
 
         throw TaskActionServiceError.invalidResponse
@@ -178,13 +191,17 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         let data = try await postEdgeFunction(
-            path: "functions/v1/update-task-status",
+            endpoint: "update-task-status",
             body: request,
             idempotencyKey: idempotencyKey
         )
 
         if let payload = decodeSingleWrapper(data, as: UpdateTaskStatusResponse.self) {
             return payload
+        }
+
+        if let embeddedError = classifyActionPayloadError(data) {
+            throw embeddedError
         }
 
         throw TaskActionServiceError.invalidResponse
@@ -196,13 +213,17 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         let data = try await postEdgeFunction(
-            path: "functions/v1/message-marked-sent",
+            endpoint: "message-marked-sent",
             body: request,
             idempotencyKey: idempotencyKey
         )
 
         if let payload = decodeSingleWrapper(data, as: MessageMarkedSentResponse.self) {
             return payload
+        }
+
+        if let embeddedError = classifyActionPayloadError(data) {
+            throw embeddedError
         }
 
         throw TaskActionServiceError.invalidResponse
@@ -520,6 +541,13 @@ struct RemoteTaskService: TaskServiceProtocol {
                 throw TaskActionServiceError.accessDenied(message: message)
             }
 
+            if httpResponse.statusCode == 404 {
+                logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
+                throw TaskActionServiceError.retryable(
+                    message: missingFunctionDeploymentMessage(endpoint: endpoint)
+                )
+            }
+
             if isRateLimitedStatus(httpResponse.statusCode) || isRetryableStatus(httpResponse.statusCode) {
                 logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
                 let message = decodeErrorMessage(data) ?? "Task data is temporarily unavailable. Please try again."
@@ -576,15 +604,15 @@ struct RemoteTaskService: TaskServiceProtocol {
     }
 
     private func postEdgeFunction<T: Codable>(
-        path: String,
+        endpoint: String,
         body: T,
         idempotencyKey: String?
     ) async throws -> Data {
-        guard let baseURL = environment.baseURL else {
+        guard let url = edgeFunctionURL(endpoint: endpoint, queryItems: []) else {
             throw TaskActionServiceError.missingBaseURL
         }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -608,6 +636,12 @@ struct RemoteTaskService: TaskServiceProtocol {
             if isAccessStatus(httpResponse.statusCode) {
                 let message = decodeErrorMessage(data) ?? "Your current access does not allow this action."
                 throw TaskActionServiceError.accessDenied(message: message)
+            }
+
+            if httpResponse.statusCode == 404 {
+                throw TaskActionServiceError.retryable(
+                    message: missingFunctionDeploymentMessage(endpoint: endpoint)
+                )
             }
 
             if isRetryableStatus(httpResponse.statusCode) {
@@ -667,6 +701,68 @@ struct RemoteTaskService: TaskServiceProtocol {
             return payload.message ?? payload.errorMessage ?? payload.detail ?? payload.error
         }
         return nil
+    }
+
+    private func classifyActionPayloadError(_ data: Data) -> TaskActionServiceError? {
+        struct PayloadEnvelope: Decodable {
+            struct PayloadError: Decodable {
+                let code: String?
+                let message: String?
+                let retryable: Bool?
+            }
+
+            let ok: Bool?
+            let message: String?
+            let error: PayloadError?
+            let errorCode: String?
+            let errorMessage: String?
+            let detail: String?
+
+            enum CodingKeys: String, CodingKey {
+                case ok
+                case message
+                case error
+                case errorCode = "error_code"
+                case errorMessage = "error_message"
+                case detail
+            }
+        }
+
+        guard let envelope = try? JSONDecoder().decode(PayloadEnvelope.self, from: data) else {
+            return nil
+        }
+
+        let hasErrorSignal = envelope.ok == false ||
+            envelope.error != nil ||
+            envelope.errorCode != nil ||
+            envelope.errorMessage != nil
+        guard hasErrorSignal else { return nil }
+
+        let code = normalizedCode(envelope.error?.code ?? envelope.errorCode)
+        let message = sanitizeBackendMessage(
+            envelope.error?.message ??
+            envelope.errorMessage ??
+            envelope.message ??
+            envelope.detail
+        ) ?? "Action failed."
+        let normalizedMessage = message.lowercased()
+
+        if isAccessLikeError(code: code, message: normalizedMessage) ||
+            isAuthLikeError(code: code, message: normalizedMessage) {
+            return .accessDenied(message: message)
+        }
+
+        if code == "rate_limited" ||
+            normalizedMessage.contains("rate limit") ||
+            normalizedMessage.contains("too many requests") {
+            return .retryable(message: message)
+        }
+
+        if envelope.error?.retryable == true || isRetryableLikeError(code: code, message: normalizedMessage) {
+            return .retryable(message: message)
+        }
+
+        return .retryable(message: message)
     }
 
     private func classifyReadPayloadError(_ data: Data) -> TaskActionServiceError? {
@@ -729,6 +825,10 @@ struct RemoteTaskService: TaskServiceProtocol {
         }
 
         return .retryable(message: message)
+    }
+
+    private func missingFunctionDeploymentMessage(endpoint: String) -> String {
+        "Backend function '\(endpoint)' is unavailable. Please deploy/update this Edge Function and retry."
     }
 
     private func decodeSingleWrapper<T: Decodable>(_ data: Data, as type: T.Type) -> T? {

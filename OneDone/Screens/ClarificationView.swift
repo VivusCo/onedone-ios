@@ -13,6 +13,7 @@ struct ClarificationView: View {
     @State private var isSubmitting: Bool = false
     @State private var submitErrorMessage: String?
     @State private var splitPreviewMessage: String?
+    @State private var showSubscriptionGate: Bool = false
 
     @Environment(\.dismiss) private var dismiss
 
@@ -66,6 +67,11 @@ struct ClarificationView: View {
                     let pendingTask = appState.makeNeedsClarificationTask(from: activeDraft)
                     appState.saveTask(pendingTask)
                     appState.selectedTab = .tasks
+                    if appState.shouldUseRemoteTaskActions {
+                        Task {
+                            _ = await appState.refreshTasksFromRemote()
+                        }
+                    }
                     dismiss()
                 }
 
@@ -105,6 +111,14 @@ struct ClarificationView: View {
         .navigationDestination(isPresented: $showTaskResult) {
             if let taskResult {
                 TaskResultView(appState: appState, task: taskResult)
+            }
+        }
+        .sheet(isPresented: $showSubscriptionGate) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showSubscriptionGate = false
             }
         }
     }
@@ -150,12 +164,37 @@ struct ClarificationView: View {
             case let .splitPreview(message):
                 splitPreviewMessage = message
             }
+        } catch let actionError as TaskActionServiceError {
+            handleClarificationActionError(actionError)
+        } catch is SupabaseAuthServiceError {
+            appState.authErrorMessage = "Your session expired. Please log in again."
+            appState.phase = .auth
         } catch {
             if let localizedError = error as? LocalizedError, let description = localizedError.errorDescription {
                 submitErrorMessage = description
             } else {
                 submitErrorMessage = "Could not apply clarification right now. Please try again."
             }
+        }
+    }
+
+    @MainActor
+    private func handleClarificationActionError(_ error: TaskActionServiceError) {
+        switch error {
+        case let .accessDenied(message):
+            let normalized = message.lowercased()
+            if normalized.contains("session") ||
+                normalized.contains("log in") ||
+                normalized.contains("unauthorized") {
+                appState.authErrorMessage = "Your session expired. Please log in again."
+                appState.phase = .auth
+                return
+            }
+
+            submitErrorMessage = message
+            showSubscriptionGate = true
+        default:
+            submitErrorMessage = error.errorDescription ?? "Could not apply clarification right now. Please try again."
         }
     }
 
