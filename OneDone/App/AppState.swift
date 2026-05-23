@@ -465,6 +465,7 @@ final class AppState {
 
             let draft = TaskDraft(
                 backendTaskID: taskID,
+                backendClarificationID: payload.clarificationID,
                 title: (title?.isEmpty == false) ? title! : inferredTaskTitle(from: prompt),
                 prompt: prompt,
                 intent: selectedTemplate?.resolvedBackendTemplateID == "cancel_subscription" ? .cancelSubscription : .generic,
@@ -542,10 +543,20 @@ final class AppState {
         guard let backendTaskID = draft.backendTaskID else {
             throw TaskActionServiceError.missingBackendTaskID
         }
+        guard let clarificationID = draft.backendClarificationID, !clarificationID.isEmpty else {
+            throw TaskActionServiceError.unsupportedResponse(
+                message: "Clarification details are incomplete. Please retry from My Tasks."
+            )
+        }
 
         try await ensureValidSessionForRemoteUse()
 
-        let request = AnswerClarificationRequest(taskID: backendTaskID, answer: answer)
+        let request = AnswerClarificationRequest(
+            taskID: backendTaskID,
+            clarificationID: clarificationID,
+            answerText: answer,
+            billingSource: deriveBillingSource(fromClarificationAnswer: answer)
+        )
         let remoteResponse = try await services.taskService.submitAnswerClarification(
             request,
             idempotencyKey: idempotencyKey
@@ -555,6 +566,7 @@ final class AppState {
         case let .clarification(taskID, payload):
             var updatedDraft = draft
             updatedDraft.backendTaskID = taskID
+            updatedDraft.backendClarificationID = payload.clarificationID
             updatedDraft.requiresClarification = true
             updatedDraft.clarificationQuestion = firstNonEmpty(payload.question, "I need one more detail before I continue.")
             updatedDraft.clarificationOptions = payload.options
@@ -675,10 +687,29 @@ final class AppState {
             )
 
             let normalizedStatus = TaskStatus.fromBackend(response.status)
-            if normalizedStatus != .new {
-                updateTask(taskID) { task in
+            updateTask(taskID) { task in
+                if normalizedStatus != .new {
                     task.status = normalizedStatus
                 }
+                if let remoteMessage = normalizedNonEmptyString(response.message) {
+                    task.lastEventPreview = remoteMessage
+                    task.timeline.append(
+                        TaskTimelineEntry(
+                            title: "Backend sync",
+                            detail: remoteMessage,
+                            date: Date()
+                        )
+                    )
+                }
+            }
+
+            let detailRefreshWarning = await refreshTaskDetailFromRemote(taskID: taskID)
+            let listRefreshWarning = await refreshTasksFromRemote()
+            if let detailRefreshWarning {
+                return "Message marked as sent, but task detail refresh failed. \(detailRefreshWarning)"
+            }
+            if let listRefreshWarning {
+                return "Message marked as sent, but task list refresh failed. \(listRefreshWarning)"
             }
             return nil
         } catch {
@@ -874,10 +905,10 @@ final class AppState {
                     if let existingReminderID = existingTask.backendReminderID {
                         syncResponse = try await services.reminderService.syncReminderUpdate(
                             ReminderUpdateRequest(
-                                taskID: backendTaskID,
                                 reminderID: existingReminderID,
                                 remindAtISO8601: ISO8601DateFormatter().string(from: safeDate),
-                                iosNotificationID: identifier
+                                iosNotificationID: identifier,
+                                localNotificationStatus: "scheduled"
                             )
                         )
                     } else {
@@ -950,19 +981,20 @@ final class AppState {
 
         var backendSyncWarning: String?
         if shouldUseRemoteTaskActions,
-           let backendTaskID = existingTask.backendTaskID,
-           !backendTaskID.isEmpty {
-            do {
-                try await ensureValidSessionForRemoteUse()
-                _ = try await services.reminderService.syncReminderCancel(
-                    ReminderCancelRequest(
-                        taskID: backendTaskID,
-                        reminderID: existingTask.backendReminderID,
-                        iosNotificationID: existingTask.reminderNotificationID
+           existingTask.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            if let backendReminderID = existingTask.backendReminderID, !backendReminderID.isEmpty {
+                do {
+                    try await ensureValidSessionForRemoteUse()
+                    _ = try await services.reminderService.syncReminderCancel(
+                        ReminderCancelRequest(
+                            reminderID: backendReminderID
+                        )
                     )
-                )
-            } catch {
-                backendSyncWarning = friendlyRemoteErrorMessage(error)
+                } catch {
+                    backendSyncWarning = friendlyRemoteErrorMessage(error)
+                }
+            } else {
+                backendSyncWarning = "Backend reminder ID is missing, so remote cancel could not be synced."
             }
         }
 
@@ -1013,27 +1045,29 @@ final class AppState {
 
             var backendSyncWarning: String?
             if shouldUseRemoteTaskActions,
-               let backendTaskID = existingTask.backendTaskID,
-               !backendTaskID.isEmpty {
-                do {
-                    try await ensureValidSessionForRemoteUse()
-                    let syncResponse = try await services.reminderService.syncReminderSnooze(
-                        ReminderSnoozeRequest(
-                            taskID: backendTaskID,
-                            reminderID: existingTask.backendReminderID,
-                            iosNotificationID: identifier,
-                            remindAtISO8601: ISO8601DateFormatter().string(from: snoozeDate),
-                            snoozeMinutes: max(1, hours) * 60
+               existingTask.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+                if let backendReminderID = existingTask.backendReminderID, !backendReminderID.isEmpty {
+                    do {
+                        try await ensureValidSessionForRemoteUse()
+                        let syncResponse = try await services.reminderService.syncReminderSnooze(
+                            ReminderSnoozeRequest(
+                                reminderID: backendReminderID,
+                                snoozeUntilISO8601: ISO8601DateFormatter().string(from: snoozeDate),
+                                iosNotificationID: identifier,
+                                localNotificationStatus: "scheduled"
+                            )
                         )
-                    )
 
-                    updateTask(taskID) { task in
-                        if let reminderID = syncResponse.reminderID, !reminderID.isEmpty {
-                            task.backendReminderID = reminderID
+                        updateTask(taskID) { task in
+                            if let reminderID = syncResponse.reminderID, !reminderID.isEmpty {
+                                task.backendReminderID = reminderID
+                            }
                         }
+                    } catch {
+                        backendSyncWarning = friendlyRemoteErrorMessage(error)
                     }
-                } catch {
-                    backendSyncWarning = friendlyRemoteErrorMessage(error)
+                } else {
+                    backendSyncWarning = "Backend reminder ID is missing, so remote snooze could not be synced."
                 }
             }
 
@@ -1350,6 +1384,17 @@ final class AppState {
             }
         }
         return ""
+    }
+
+    private func deriveBillingSource(fromClarificationAnswer answer: String) -> String? {
+        let normalized = answer.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalized.isEmpty else { return nil }
+
+        if normalized.contains("app store") {
+            return "app_store"
+        }
+
+        return nil
     }
 
     private func friendlyRemoteErrorMessage(_ error: Error) -> String {

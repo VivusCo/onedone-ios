@@ -207,6 +207,7 @@ extension TaskTemplate {
 struct TaskDraft: Identifiable, Hashable {
     let id: UUID
     var backendTaskID: String?
+    var backendClarificationID: String?
     var title: String
     var prompt: String
     var intent: TaskIntent
@@ -220,6 +221,7 @@ struct TaskDraft: Identifiable, Hashable {
     init(
         id: UUID = UUID(),
         backendTaskID: String? = nil,
+        backendClarificationID: String? = nil,
         title: String,
         prompt: String,
         intent: TaskIntent = .generic,
@@ -232,6 +234,7 @@ struct TaskDraft: Identifiable, Hashable {
     ) {
         self.id = id
         self.backendTaskID = backendTaskID
+        self.backendClarificationID = backendClarificationID
         self.title = title
         self.prompt = prompt
         self.intent = intent

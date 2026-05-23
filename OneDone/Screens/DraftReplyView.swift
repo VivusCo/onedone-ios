@@ -305,9 +305,22 @@ struct DraftReplyView: View {
         actionFeedback = nil
         defer { isRegeneratingReply = false }
 
-        if appState.shouldUseRemoteTaskActions,
-           let task,
-           task.backendTaskID != nil {
+        if appState.services.runtimeMode == .remoteAccessState {
+            guard appState.shouldUseRemoteTaskActions else {
+                actionFeedback = "Please log in again to regenerate this reply."
+                return
+            }
+
+            guard let task else {
+                actionFeedback = "Task is unavailable right now."
+                return
+            }
+
+            guard task.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+                actionFeedback = "This task is missing a backend identifier, so reply regeneration is unavailable."
+                return
+            }
+
             do {
                 let response = try await appState.requestReplyRegeneration(
                     taskID: taskID,
@@ -336,6 +349,16 @@ struct DraftReplyView: View {
 
         let syncWarning = await appState.markTaskSentAndSync(taskID, sentMessage: messageBody)
         actionFeedback = syncWarning
+        if let syncWarning {
+            let normalized = syncWarning.lowercased()
+            if normalized.contains("session") ||
+                normalized.contains("log in") ||
+                normalized.contains("unauthorized") {
+                appState.authErrorMessage = "Your session expired. Please log in again."
+                appState.phase = .auth
+                return
+            }
+        }
         showPostCopyPrompt = false
         showFollowUpReminderFlow = true
         reminderConfirmation = nil

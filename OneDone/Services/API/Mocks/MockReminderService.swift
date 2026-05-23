@@ -20,7 +20,7 @@ struct MockReminderService: ReminderServiceProtocol {
 
     func syncReminderUpdate(_ request: ReminderUpdateRequest) async throws -> ReminderSyncResponse {
         ReminderSyncResponse(
-            taskID: request.taskID,
+            taskID: nil,
             reminderID: request.reminderID,
             status: "active",
             message: "Mock reminder update synced."
@@ -29,7 +29,7 @@ struct MockReminderService: ReminderServiceProtocol {
 
     func syncReminderCancel(_ request: ReminderCancelRequest) async throws -> ReminderSyncResponse {
         ReminderSyncResponse(
-            taskID: request.taskID,
+            taskID: nil,
             reminderID: request.reminderID,
             status: "canceled",
             message: "Mock reminder cancel synced."
@@ -38,7 +38,7 @@ struct MockReminderService: ReminderServiceProtocol {
 
     func syncReminderSnooze(_ request: ReminderSnoozeRequest) async throws -> ReminderSyncResponse {
         ReminderSyncResponse(
-            taskID: request.taskID,
+            taskID: nil,
             reminderID: request.reminderID,
             status: "active",
             message: "Mock reminder snooze synced."

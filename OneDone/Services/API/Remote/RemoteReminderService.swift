@@ -29,7 +29,7 @@ struct RemoteReminderService: ReminderServiceProtocol {
         }
 
         return try await postReminderAction(
-            path: "functions/v1/reminder-create",
+            endpoint: "reminder-create",
             body: request
         )
     }
@@ -40,7 +40,7 @@ struct RemoteReminderService: ReminderServiceProtocol {
         }
 
         return try await postReminderAction(
-            path: "functions/v1/reminder-update",
+            endpoint: "reminder-update",
             body: request
         )
     }
@@ -51,7 +51,7 @@ struct RemoteReminderService: ReminderServiceProtocol {
         }
 
         return try await postReminderAction(
-            path: "functions/v1/reminder-cancel",
+            endpoint: "reminder-cancel",
             body: request
         )
     }
@@ -62,7 +62,7 @@ struct RemoteReminderService: ReminderServiceProtocol {
         }
 
         return try await postReminderAction(
-            path: "functions/v1/reminder-snooze",
+            endpoint: "reminder-snooze",
             body: request
         )
     }
@@ -89,18 +89,26 @@ struct RemoteReminderService: ReminderServiceProtocol {
             return [singleReminder]
         }
 
+        if let embeddedError = classifyReadPayloadError(data) {
+            throw embeddedError
+        }
+
         logReadDecodeFailure(endpoint: "get-reminders", data: data)
         return []
     }
 
     private func postReminderAction<T: Codable>(
-        path: String,
+        endpoint: String,
         body: T
     ) async throws -> ReminderSyncResponse {
-        let data = try await post(path: path, body: body)
+        let data = try await post(endpoint: endpoint, body: body)
 
         if let response = decodeSingleWrapper(data, as: ReminderSyncResponse.self) {
             return response
+        }
+
+        if let embeddedError = classifyActionPayloadError(data) {
+            throw embeddedError
         }
 
         throw ReminderSyncServiceError.invalidResponse
@@ -129,6 +137,13 @@ struct RemoteReminderService: ReminderServiceProtocol {
                 logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
                 let message = decodeErrorMessage(data) ?? "Access denied for reminders."
                 throw ReminderSyncServiceError.accessDenied(message: message)
+            }
+
+            if httpResponse.statusCode == 404 {
+                logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
+                throw ReminderSyncServiceError.retryable(
+                    message: missingFunctionDeploymentMessage(endpoint: endpoint)
+                )
             }
 
             if httpResponse.statusCode == 408 || httpResponse.statusCode == 409 || httpResponse.statusCode == 425 ||
@@ -161,12 +176,12 @@ struct RemoteReminderService: ReminderServiceProtocol {
         }
     }
 
-    private func post<T: Codable>(path: String, body: T) async throws -> Data {
-        guard let baseURL = environment.baseURL else {
+    private func post<T: Codable>(endpoint: String, body: T) async throws -> Data {
+        guard let url = edgeFunctionURL(endpoint: endpoint, queryItems: []) else {
             throw ReminderSyncServiceError.missingBaseURL
         }
 
-        var request = URLRequest(url: baseURL.appendingPathComponent(path))
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -186,6 +201,12 @@ struct RemoteReminderService: ReminderServiceProtocol {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 402 || httpResponse.statusCode == 403 {
                 let message = decodeErrorMessage(data) ?? "Access denied for reminder action."
                 throw ReminderSyncServiceError.accessDenied(message: message)
+            }
+
+            if httpResponse.statusCode == 404 {
+                throw ReminderSyncServiceError.retryable(
+                    message: missingFunctionDeploymentMessage(endpoint: endpoint)
+                )
             }
 
             if httpResponse.statusCode == 408 || httpResponse.statusCode == 409 || httpResponse.statusCode == 425 ||
@@ -255,6 +276,67 @@ struct RemoteReminderService: ReminderServiceProtocol {
         return nil
     }
 
+    private func classifyActionPayloadError(_ data: Data) -> ReminderSyncServiceError? {
+        struct PayloadEnvelope: Decodable {
+            struct PayloadError: Decodable {
+                let code: String?
+                let message: String?
+                let retryable: Bool?
+            }
+
+            let ok: Bool?
+            let message: String?
+            let error: PayloadError?
+            let errorCode: String?
+            let errorMessage: String?
+            let detail: String?
+
+            enum CodingKeys: String, CodingKey {
+                case ok
+                case message
+                case error
+                case errorCode = "error_code"
+                case errorMessage = "error_message"
+                case detail
+            }
+        }
+
+        guard let envelope = try? JSONDecoder().decode(PayloadEnvelope.self, from: data) else {
+            return nil
+        }
+
+        let hasErrorSignal = envelope.ok == false ||
+            envelope.error != nil ||
+            envelope.errorCode != nil ||
+            envelope.errorMessage != nil
+        guard hasErrorSignal else { return nil }
+
+        let message = sanitizeBackendMessage(
+            envelope.error?.message ??
+            envelope.errorMessage ??
+            envelope.message ??
+            envelope.detail
+        ) ?? "Reminder action failed."
+
+        let normalizedCode = normalizedCode(envelope.error?.code ?? envelope.errorCode)
+        let normalizedMessage = message.lowercased()
+
+        if isAccessLikeError(code: normalizedCode, message: normalizedMessage) ||
+            isAuthLikeError(code: normalizedCode, message: normalizedMessage) {
+            return .accessDenied(message: message)
+        }
+
+        if envelope.error?.retryable == true || isRetryableLikeError(code: normalizedCode, message: normalizedMessage) {
+            return .retryable(message: message)
+        }
+
+        return .retryable(message: message)
+    }
+
+    private func classifyReadPayloadError(_ data: Data) -> ReminderSyncServiceError? {
+        classifyActionPayloadError(data)
+    }
+
     private func decodeSingleWrapper<T: Decodable>(_ data: Data, as type: T.Type) -> T? {
         if let direct = try? JSONDecoder().decode(T.self, from: data) {
             return direct
@@ -298,6 +380,57 @@ struct RemoteReminderService: ReminderServiceProtocol {
         }
 
         return nil
+    }
+
+    private func missingFunctionDeploymentMessage(endpoint: String) -> String {
+        "Backend function '\(endpoint)' is unavailable. Please deploy/update this Edge Function and retry."
+    }
+
+    private func sanitizeBackendMessage(_ message: String?) -> String? {
+        guard let message else { return nil }
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func normalizedCode(_ code: String?) -> String? {
+        guard let code else { return nil }
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.replacingOccurrences(of: "-", with: "_")
+    }
+
+    private func isAuthLikeError(code: String?, message: String) -> Bool {
+        if let code, code.contains("unauthorized") || code.contains("auth") || code.contains("session") {
+            return true
+        }
+
+        return message.contains("unauthorized") ||
+            message.contains("session") ||
+            message.contains("token") ||
+            message.contains("log in")
+    }
+
+    private func isAccessLikeError(code: String?, message: String) -> Bool {
+        if let code, code.contains("access") || code.contains("billing") || code.contains("trial") || code.contains("subscription") {
+            return true
+        }
+
+        return message.contains("access") ||
+            message.contains("trial") ||
+            message.contains("subscription") ||
+            message.contains("billing")
+    }
+
+    private func isRetryableLikeError(code: String?, message: String) -> Bool {
+        if let code {
+            if code.contains("retryable") || code.contains("processing_failed") || code.contains("internal_error") {
+                return true
+            }
+        }
+
+        return message.contains("try again") ||
+            message.contains("temporarily unavailable") ||
+            message.contains("timed out")
     }
 
     private func edgeFunctionURL(endpoint: String, queryItems: [URLQueryItem]) -> URL? {

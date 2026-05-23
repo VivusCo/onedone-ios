@@ -212,6 +212,14 @@ struct NewTaskView: View {
     private func handleAnalyzeError(_ error: AnalyzeTaskServiceError) {
         switch error {
         case let .accessDenied(message):
+            let normalized = message.lowercased()
+            if normalized.contains("session") ||
+                normalized.contains("log in") ||
+                normalized.contains("unauthorized") {
+                appState.authErrorMessage = "Your session expired. Please log in again."
+                appState.phase = .auth
+                return
+            }
             submitErrorMessage = message
             showSubscriptionGate = true
         case let .rateLimited(message):

@@ -118,6 +118,24 @@ private struct AnalyzeTaskLooseOption: Decodable {
     }
 }
 
+private struct AnalyzeTaskDynamicContent: Decodable {
+    let summary: String?
+    let message: String?
+    let draftReply: String?
+
+    enum CodingKeys: String, CodingKey {
+        case summary
+        case message
+        case draftReply = "draft_reply"
+    }
+
+    var resolvedMessage: String? {
+        [draftReply, summary, message]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty })
+    }
+}
+
 private struct AnalyzeTaskTaskReference: Decodable {
     let id: String?
 
@@ -208,17 +226,23 @@ private extension KeyedDecodingContainer where Key == AnalyzeTaskDynamicKey {
 }
 
 struct AnalyzeTaskClarificationPayload: Decodable {
+    var clarificationID: String?
+    var status: String?
     var question: String?
     var helperText: String?
     var options: [String]
     var title: String?
 
     init(
+        clarificationID: String? = nil,
+        status: String? = nil,
         question: String?,
         helperText: String?,
         options: [String],
         title: String?
     ) {
+        self.clarificationID = clarificationID
+        self.status = status
         self.question = question
         self.helperText = helperText
         self.options = options
@@ -228,6 +252,8 @@ struct AnalyzeTaskClarificationPayload: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
 
+        clarificationID = container.decodeString(forKeys: ["id", "clarification_id"])
+        status = container.decodeString(forKeys: ["status"])
         question = container.decodeString(forKeys: ["question", "prompt"])
         helperText = container.decodeString(forKeys: ["helper_text", "helperText", "hint"])
         title = container.decodeString(forKeys: ["title", "heading"])
@@ -271,6 +297,11 @@ struct AnalyzeTaskAnalysisPayload: Decodable {
         if nextSteps.isEmpty,
            let nextStep = container.decodeString(forKeys: ["next_step"]) {
             nextSteps = [nextStep]
+        }
+
+        if nextSteps.isEmpty,
+           let currentNextStep = container.decodeString(forKeys: ["current_next_step", "currentNextStep"]) {
+            nextSteps = [currentNextStep]
         }
 
         category = container.decodeString(forKeys: ["category", "intent"])
@@ -371,6 +402,13 @@ struct AnalyzeTaskResponseDTO: Decodable {
         multiTaskSplitPreview = container.decodeObject(forKeys: ["multi_task_split_preview", "split_preview"])
         access = container.decodeObject(forKeys: ["access"])
 
+        if var clarification,
+           clarification.clarificationID == nil {
+            clarification.clarificationID = container.decodeString(forKeys: ["clarification_id"])
+            clarification.status = clarification.status ?? container.decodeString(forKeys: ["status"])
+            self.clarification = clarification
+        }
+
         let explicitError: AnalyzeTaskErrorPayload? = container.decodeObject(forKeys: ["error"])
         let inferredErrorCode = container.decodeString(forKeys: ["error_code"])
         let inferredErrorMessage = container.decodeString(forKeys: ["error_message", "error_description", "detail"])
@@ -390,6 +428,8 @@ struct AnalyzeTaskResponseDTO: Decodable {
 
         if clarification == nil {
             let inferredClarification = AnalyzeTaskClarificationPayload(
+                clarificationID: container.decodeString(forKeys: ["clarification_id", "id"]),
+                status: container.decodeString(forKeys: ["status"]),
                 question: container.decodeString(forKeys: ["question", "clarification_question"]),
                 helperText: container.decodeString(forKeys: ["helper_text", "clarification_helper_text"]),
                 options: container.decodeStringArray(forKeys: ["options", "clarification_options"]) ?? [],
@@ -472,11 +512,15 @@ struct AnalyzeTaskResponse: Codable {
 
 struct AnswerClarificationRequest: Codable {
     var taskID: String
-    var answer: String
+    var clarificationID: String
+    var answerText: String
+    var billingSource: String?
 
     enum CodingKeys: String, CodingKey {
         case taskID = "task_id"
-        case answer
+        case clarificationID = "clarification_id"
+        case answerText = "answer_text"
+        case billingSource = "billing_source"
     }
 }
 
@@ -502,15 +546,52 @@ struct GenerateReplyRequest: Codable {
     }
 }
 
-struct GenerateReplyResponse: Codable {
+struct GenerateReplyResponse: Decodable {
     var taskID: String
     var subject: String?
     var message: String
 
-    enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
-        case subject
-        case message
+    init(taskID: String, subject: String?, message: String) {
+        self.taskID = taskID
+        self.subject = subject
+        self.message = message
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        guard let resolvedTaskID = container.decodeString(forKeys: ["task_id", "id"]) else {
+            throw DecodingError.valueNotFound(
+                String.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Missing task_id/id for GenerateReplyResponse"
+                )
+            )
+        }
+
+        let resolvedMessage = container.decodeString(forKeys: ["message", "draft_reply"])
+        if resolvedMessage == nil,
+           let contentObject = container.decodeObject(forKeys: ["content"], as: AnalyzeTaskDynamicContent.self) {
+            taskID = resolvedTaskID
+            subject = container.decodeString(forKeys: ["subject"])
+            message = contentObject.resolvedMessage ?? "Reply generated."
+            return
+        }
+
+        guard let resolvedMessage else {
+            throw DecodingError.valueNotFound(
+                String.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Missing draft reply message"
+                )
+            )
+        }
+
+        taskID = resolvedTaskID
+        subject = container.decodeString(forKeys: ["subject"])
+        message = resolvedMessage
     }
 }
 
@@ -536,15 +617,33 @@ struct MessageMarkedSentRequest: Codable {
     }
 }
 
-struct MessageMarkedSentResponse: Codable {
+struct MessageMarkedSentResponse: Decodable {
     var taskID: String
     var status: String
     var message: String?
 
-    enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
-        case status
-        case message
+    init(taskID: String, status: String, message: String?) {
+        self.taskID = taskID
+        self.status = status
+        self.message = message
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        guard let resolvedTaskID = container.decodeString(forKeys: ["task_id", "id"]) else {
+            throw DecodingError.valueNotFound(
+                String.self,
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription: "Missing task_id/id for MessageMarkedSentResponse"
+                )
+            )
+        }
+
+        taskID = resolvedTaskID
+        status = container.decodeString(forKeys: ["status"]) ?? "waiting_for_reply"
+        message = container.decodeString(forKeys: ["message", "event_message"])
     }
 }
 
@@ -605,58 +704,73 @@ struct ReminderCreateRequest: Codable {
 }
 
 struct ReminderUpdateRequest: Codable {
-    var taskID: String
-    var reminderID: String?
-    var remindAtISO8601: String
-    var iosNotificationID: String
+    var reminderID: String
+    var remindAtISO8601: String?
+    var iosNotificationID: String?
+    var localNotificationStatus: String?
 
     enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
         case reminderID = "reminder_id"
         case remindAtISO8601 = "remind_at"
         case iosNotificationID = "ios_notification_id"
+        case localNotificationStatus = "local_notification_status"
     }
 }
 
 struct ReminderCancelRequest: Codable {
-    var taskID: String
-    var reminderID: String?
-    var iosNotificationID: String?
+    var reminderID: String
 
     enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
         case reminderID = "reminder_id"
-        case iosNotificationID = "ios_notification_id"
     }
 }
 
 struct ReminderSnoozeRequest: Codable {
-    var taskID: String
-    var reminderID: String?
-    var iosNotificationID: String
-    var remindAtISO8601: String
-    var snoozeMinutes: Int
+    var reminderID: String
+    var snoozeUntilISO8601: String
+    var iosNotificationID: String?
+    var localNotificationStatus: String?
 
     enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
         case reminderID = "reminder_id"
+        case snoozeUntilISO8601 = "snooze_until"
         case iosNotificationID = "ios_notification_id"
-        case remindAtISO8601 = "remind_at"
-        case snoozeMinutes = "snooze_minutes"
+        case localNotificationStatus = "local_notification_status"
     }
 }
 
-struct ReminderSyncResponse: Codable {
+struct ReminderSyncResponse: Decodable {
     var taskID: String?
     var reminderID: String?
     var status: String?
     var message: String?
 
-    enum CodingKeys: String, CodingKey {
-        case taskID = "task_id"
-        case reminderID = "reminder_id"
-        case status
-        case message
+    init(taskID: String?, reminderID: String?, status: String?, message: String?) {
+        self.taskID = taskID
+        self.reminderID = reminderID
+        self.status = status
+        self.message = message
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: AnalyzeTaskDynamicKey.self)
+
+        taskID = container.decodeString(forKeys: ["task_id"])
+        reminderID = container.decodeString(forKeys: ["reminder_id", "id"])
+        status = container.decodeString(forKeys: ["status"])
+        message = container.decodeString(forKeys: ["message", "event_message"])
+
+        if let reminderObject = container.decodeObject(forKeys: ["reminder"], as: BackendReminderDTO.self) {
+            if reminderID == nil {
+                reminderID = reminderObject.reminderID
+            }
+            if taskID == nil {
+                taskID = reminderObject.taskID
+            }
+            if status == nil {
+                status = reminderObject.status
+            }
+        }
     }
 }
 
