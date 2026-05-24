@@ -112,11 +112,45 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         )
 
         if let decoded = decodeSingleWrapper(data, as: ValidateSubscriptionResponse.self) {
+            logSubscriptionStage(stage: "subscription_validation_success_decoded")
             return decoded
         }
 
         if let accessStateDTO = decodeSingleWrapper(data, as: GetAccessStateDTO.self) {
+            logSubscriptionStage(stage: "subscription_validation_success_decoded")
             return ValidateSubscriptionResponse(access: accessStateDTO.access)
+        }
+
+        if let envelope = decodeSingleWrapper(data, as: SubscriptionSyncEnvelopeDTO.self) {
+            if envelope.ok {
+                logSubscriptionStage(stage: "subscription_validation_success_decoded")
+
+                if let access = envelope.access {
+                    return ValidateSubscriptionResponse(access: access)
+                }
+
+                if let accessState = envelope.accessState {
+                    return ValidateSubscriptionResponse(
+                        access: APIAccessStatePayload(
+                            accessState: accessState,
+                            starterDaysRemaining: nil,
+                            statusNote: nil
+                        )
+                    )
+                }
+
+                return ValidateSubscriptionResponse(
+                    access: APIAccessStatePayload(
+                        accessState: .trial_not_started,
+                        starterDaysRemaining: nil,
+                        statusNote: nil
+                    )
+                )
+            }
+
+            let backendError = decodeBackendError(data)
+            let message = sanitizeBackendMessage(backendError?.message) ?? "Subscription validation failed. Please try again."
+            throw SubscriptionServiceError.backendValidationFailed(message: message)
         }
 
         throw SubscriptionServiceError.invalidResponse
@@ -134,6 +168,36 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 
         if let accessStateDTO = decodeSingleWrapper(data, as: GetAccessStateDTO.self) {
             return RestorePurchasesResponse(access: accessStateDTO.access)
+        }
+
+        if let envelope = decodeSingleWrapper(data, as: SubscriptionSyncEnvelopeDTO.self) {
+            if envelope.ok {
+                if let access = envelope.access {
+                    return RestorePurchasesResponse(access: access)
+                }
+
+                if let accessState = envelope.accessState {
+                    return RestorePurchasesResponse(
+                        access: APIAccessStatePayload(
+                            accessState: accessState,
+                            starterDaysRemaining: nil,
+                            statusNote: nil
+                        )
+                    )
+                }
+
+                return RestorePurchasesResponse(
+                    access: APIAccessStatePayload(
+                        accessState: .trial_not_started,
+                        starterDaysRemaining: nil,
+                        statusNote: nil
+                    )
+                )
+            }
+
+            let backendError = decodeBackendError(data)
+            let message = sanitizeBackendMessage(backendError?.message) ?? "Restore request failed. Please try again."
+            throw SubscriptionServiceError.backendRestoreFailed(message: message)
         }
 
         throw SubscriptionServiceError.invalidResponse

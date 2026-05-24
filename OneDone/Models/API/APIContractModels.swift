@@ -657,6 +657,46 @@ struct ValidateSubscriptionResponse: Decodable {
     }
 }
 
+struct SubscriptionSyncEnvelopeDTO: Decodable {
+    let ok: Bool
+    let access: APIAccessStatePayload?
+    let accessState: APIAccessState?
+
+    private enum CodingKeys: String, CodingKey {
+        case ok
+        case access
+        case accessState = "access_state"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if let boolValue = try? container.decode(Bool.self, forKey: .ok) {
+            ok = boolValue
+        } else if let intValue = try? container.decode(Int.self, forKey: .ok) {
+            ok = intValue != 0
+        } else if let stringValue = try? container.decode(String.self, forKey: .ok) {
+            ok = ["true", "1", "yes", "y"].contains(stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        } else {
+            ok = false
+        }
+
+        if let accessPayload = try? container.decode(APIAccessStatePayload.self, forKey: .access) {
+            access = accessPayload
+        } else {
+            access = nil
+        }
+
+        if let rawAccessState = try? container.decode(String.self, forKey: .accessState) {
+            accessState = APIAccessState(rawValue: rawAccessState)
+        } else if let access {
+            accessState = access.accessState
+        } else {
+            accessState = nil
+        }
+    }
+}
+
 struct RestorePurchasesRequest: Codable {
     var verificationMode: String?
     var entitlements: [SubscriptionEntitlementPayload]?

@@ -509,7 +509,7 @@ final class AppState {
             case .purchased:
                 logSubscriptionFlowStage(stage: "access_refresh_started")
                 try await refreshAccessStateAfterSubscriptionSync()
-                logSubscriptionFlowStage(stage: "access_refresh_completed")
+                logSubscriptionFlowStage(stage: "access_refresh_completed", refreshedAccessState: mockAccessState)
                 if isActiveAccessState(mockAccessState) {
                     return SubscriptionGateFeedback(
                         kind: .success,
@@ -520,7 +520,7 @@ final class AppState {
 
                 return SubscriptionGateFeedback(
                     kind: .warning,
-                    message: "Purchase was received, but access is still updating. Pull to refresh and try again.",
+                    message: "Subscription synced, but access is not active yet. Please try Refresh Access.",
                     shouldCloseGate: false
                 )
             }
@@ -610,7 +610,7 @@ final class AppState {
             let restoreResult = try await services.subscriptionService.restorePurchases()
             logSubscriptionFlowStage(stage: "restore_access_refresh_started")
             try await refreshAccessStateAfterSubscriptionSync()
-            logSubscriptionFlowStage(stage: "restore_access_refresh_completed")
+            logSubscriptionFlowStage(stage: "restore_access_refresh_completed", refreshedAccessState: mockAccessState)
 
             if isActiveAccessState(mockAccessState) {
                 let successMessage: String
@@ -2016,9 +2016,13 @@ final class AppState {
         return formatter.string(from: date)
     }
 
-    private func logSubscriptionFlowStage(stage: String) {
+    private func logSubscriptionFlowStage(stage: String, refreshedAccessState: APIAccessState? = nil) {
 #if DEBUG
-        print("[OneDone][Subscription] stage=\(stage)")
+        if let refreshedAccessState {
+            print("[OneDone][Subscription] stage=\(stage) refreshed_access_state=\(refreshedAccessState.rawValue)")
+        } else {
+            print("[OneDone][Subscription] stage=\(stage)")
+        }
 #endif
     }
 }
