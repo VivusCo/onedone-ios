@@ -12,11 +12,14 @@ struct APIEnvironment {
     static let useRemoteTaskAnalysisKey = "ONEDONE_USE_REMOTE_TASK_ANALYSIS"
     static let useRemoteTaskActionsKey = "ONEDONE_USE_REMOTE_TASK_ACTIONS"
     static let useRemoteReminderSyncKey = "ONEDONE_USE_REMOTE_REMINDER_SYNC"
+    // Configure this with your App Store Connect subscription product ID (safe client config).
+    static let subscriptionProductIDKey = "ONEDONE_SUBSCRIPTION_PRODUCT_ID"
     static let placeholderBaseURL = "https://your-backend.example.com"
 
     let baseURL: URL?
     let supabaseURL: URL?
     let supabaseAnonKey: String?
+    let subscriptionProductID: String?
     let forceMockRuntime: Bool
     let useRemoteAccessState: Bool
     let useRemoteTaskAnalysis: Bool
@@ -31,6 +34,7 @@ struct APIEnvironment {
             bundleValue(for: legacyBaseURLKey),
         supabaseURLString: environmentValue(for: supabaseURLKey) ?? bundleValue(for: supabaseURLKey),
         supabaseAnonKeyValue: environmentValue(for: supabaseAnonKeyKey) ?? bundleValue(for: supabaseAnonKeyKey),
+        subscriptionProductIDValue: environmentValue(for: subscriptionProductIDKey) ?? bundleValue(for: subscriptionProductIDKey),
         forceMockRuntimeValue: environmentValue(for: useMockRuntimeKey) ?? bundleValue(for: useMockRuntimeKey),
         useRemoteAccessStateValue: environmentValue(for: useRemoteAccessStateKey) ?? bundleValue(for: useRemoteAccessStateKey),
         useRemoteTaskAnalysisValue: environmentValue(for: useRemoteTaskAnalysisKey) ?? bundleValue(for: useRemoteTaskAnalysisKey),
@@ -42,6 +46,7 @@ struct APIEnvironment {
         functionsBaseURLString: String?,
         supabaseURLString: String?,
         supabaseAnonKeyValue: String?,
+        subscriptionProductIDValue: String?,
         forceMockRuntimeValue: String?,
         useRemoteAccessStateValue: String?,
         useRemoteTaskAnalysisValue: String?,
@@ -65,6 +70,13 @@ struct APIEnvironment {
             supabaseAnonKey = trimmed.isEmpty ? nil : trimmed
         } else {
             supabaseAnonKey = nil
+        }
+
+        if let subscriptionProductIDValue {
+            let trimmed = subscriptionProductIDValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            subscriptionProductID = trimmed.isEmpty ? nil : trimmed
+        } else {
+            subscriptionProductID = nil
         }
 
         forceMockRuntime = APIEnvironment.parseBool(forceMockRuntimeValue) ?? false

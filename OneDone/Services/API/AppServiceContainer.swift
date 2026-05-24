@@ -50,7 +50,10 @@ struct AppServiceContainer {
                 environment: environment,
                 tokenProvider: tokenProvider
             ),
-            subscriptionService: MockSubscriptionService()
+            subscriptionService: RemoteSubscriptionService(
+                environment: environment,
+                tokenProvider: tokenProvider
+            )
         )
     }
 

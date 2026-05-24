@@ -595,16 +595,98 @@ struct GenerateReplyResponse: Decodable {
     }
 }
 
-struct ValidateSubscriptionRequest: Codable {
+struct SubscriptionEntitlementPayload: Codable {
+    var productID: String?
     var transactionID: String
+    var originalTransactionID: String?
+    var environment: String
+    var purchasedAtISO8601: String?
+    var expiresAtISO8601: String?
+    var ownershipType: String?
+    var revocationDateISO8601: String?
+    var entitlementStatus: String?
+    var storeKitStatus: String?
+    var source: String?
+    var platform: String?
+
+    enum CodingKeys: String, CodingKey {
+        case productID = "product_id"
+        case transactionID = "transaction_id"
+        case originalTransactionID = "original_transaction_id"
+        case environment
+        case purchasedAtISO8601 = "purchased_at"
+        case expiresAtISO8601 = "expires_at"
+        case ownershipType = "ownership_type"
+        case revocationDateISO8601 = "revocation_date"
+        case entitlementStatus = "entitlement_status"
+        case storeKitStatus = "storekit_status"
+        case source
+        case platform
+    }
 }
 
-struct ValidateSubscriptionResponse: Codable {
-    var access: APIAccessStatePayload
+struct ValidateSubscriptionRequest: Codable {
+    var verificationMode: String?
+    var entitlement: SubscriptionEntitlementPayload
+
+    enum CodingKeys: String, CodingKey {
+        case verificationMode = "verification_mode"
+        case entitlement
+    }
 }
 
-struct RestorePurchasesResponse: Codable {
+struct ValidateSubscriptionResponse: Decodable {
     var access: APIAccessStatePayload
+
+    enum CodingKeys: String, CodingKey {
+        case access
+    }
+
+    init(access: APIAccessStatePayload) {
+        self.access = access
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if container.contains(.access) {
+            access = try container.decode(APIAccessStatePayload.self, forKey: .access)
+        } else {
+            access = try APIAccessStatePayload(from: decoder)
+        }
+    }
+}
+
+struct RestorePurchasesRequest: Codable {
+    var verificationMode: String?
+    var entitlements: [SubscriptionEntitlementPayload]?
+
+    enum CodingKeys: String, CodingKey {
+        case verificationMode = "verification_mode"
+        case entitlements
+    }
+}
+
+struct RestorePurchasesResponse: Decodable {
+    var access: APIAccessStatePayload
+
+    enum CodingKeys: String, CodingKey {
+        case access
+    }
+
+    init(access: APIAccessStatePayload) {
+        self.access = access
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        if container.contains(.access) {
+            access = try container.decode(APIAccessStatePayload.self, forKey: .access)
+        } else {
+            access = try APIAccessStatePayload(from: decoder)
+        }
+    }
 }
 
 struct MessageMarkedSentRequest: Codable {
