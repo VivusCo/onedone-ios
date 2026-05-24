@@ -507,7 +507,9 @@ final class AppState {
                     shouldCloseGate: false
                 )
             case .purchased:
+                logSubscriptionFlowStage(stage: "access_refresh_started")
                 try await refreshAccessStateAfterSubscriptionSync()
+                logSubscriptionFlowStage(stage: "access_refresh_completed")
                 if isActiveAccessState(mockAccessState) {
                     return SubscriptionGateFeedback(
                         kind: .success,
@@ -606,7 +608,9 @@ final class AppState {
         do {
             try await ensureValidSessionForRemoteUse()
             let restoreResult = try await services.subscriptionService.restorePurchases()
+            logSubscriptionFlowStage(stage: "restore_access_refresh_started")
             try await refreshAccessStateAfterSubscriptionSync()
+            logSubscriptionFlowStage(stage: "restore_access_refresh_completed")
 
             if isActiveAccessState(mockAccessState) {
                 let successMessage: String
@@ -2010,5 +2014,11 @@ final class AppState {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+
+    private func logSubscriptionFlowStage(stage: String) {
+#if DEBUG
+        print("[OneDone][Subscription] stage=\(stage)")
+#endif
     }
 }

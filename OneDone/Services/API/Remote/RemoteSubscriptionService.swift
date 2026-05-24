@@ -29,24 +29,42 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             throw SubscriptionServiceError.authenticationRequired
         }
 
+        logSubscriptionStage(stage: "product_load_started")
         let product = try await loadSubscriptionProduct(productID: productID)
+        logSubscriptionStage(stage: "product_loaded")
 
         do {
+            logSubscriptionStage(stage: "purchase_started")
             let purchaseResult = try await product.purchase()
+            logSubscriptionStage(stage: "purchase_result_received")
 
             switch purchaseResult {
             case let .success(verificationResult):
+                logSubscriptionStage(stage: "purchase_result_success")
+                logSubscriptionStage(stage: "transaction_verification_started")
                 let transaction = try verifiedTransaction(from: verificationResult)
+                logSubscriptionStage(stage: "transaction_verified", transactionVerified: true)
                 let request = validateRequest(from: transaction)
+                logSubscriptionStage(
+                    stage: "entitlement_payload_built",
+                    endpoint: "validate-subscription",
+                    environment: request.entitlement.environment,
+                    verificationMode: request.verificationMode
+                )
                 let response = try await validateSubscription(request)
                 await transaction.finish()
                 return .purchased(response)
             case .userCancelled:
+                logSubscriptionStage(stage: "purchase_result_cancelled")
                 return .cancelled
             case .pending:
+                logSubscriptionStage(stage: "purchase_result_pending")
                 return .pending
             @unknown default:
-                throw SubscriptionServiceError.retryable(message: "Subscription flow is temporarily unavailable. Please try again.")
+                logSubscriptionStage(stage: "purchase_result_unknown")
+                throw SubscriptionServiceError.retryable(
+                    message: "Purchase result could not be confirmed. Please try again."
+                )
             }
         } catch let error as SubscriptionServiceError {
             throw error
@@ -64,13 +82,16 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             throw SubscriptionServiceError.authenticationRequired
         }
 
+        logSubscriptionStage(stage: "restore_started")
         do {
             try await AppStore.sync()
         } catch {
             throw SubscriptionServiceError.retryable(message: "Could not restore purchases right now. Please try again.")
         }
 
+        logSubscriptionStage(stage: "current_entitlements_checked")
         let entitlements = await collectVerifiedEntitlements()
+        logSubscriptionStage(stage: "current_entitlements_count", entitlementsCount: entitlements.count)
         let entitlementPayloads = entitlements.map(subscriptionEntitlementPayload(from:))
         let request = RestorePurchasesRequest(
             verificationMode: "ios_verified_mirror",
@@ -133,6 +154,7 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         case let .verified(transaction):
             return transaction
         case .unverified:
+            logSubscriptionStage(stage: "transaction_unverified", transactionVerified: false)
             throw SubscriptionServiceError.unverifiedTransaction
         }
     }
@@ -193,14 +215,44 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        logSubscriptionRequestMetadata(endpoint: endpoint, body: body)
-        request.httpBody = try JSONEncoder().encode(body)
+        let metadata = requestMetadataContext(from: body)
+
+        let encodedBody: Data
+        do {
+            encodedBody = try JSONEncoder().encode(body)
+        } catch {
+            logSubscriptionStage(
+                stage: dispatchSkippedStage(for: endpoint),
+                endpoint: endpoint,
+                environment: metadata.environment,
+                verificationMode: metadata.verificationMode
+            )
+            throw SubscriptionServiceError.retryable(
+                message: "Could not prepare subscription request. Please try again."
+            )
+        }
+        request.httpBody = encodedBody
 
         do {
+            logSubscriptionStage(
+                stage: dispatchStage(for: endpoint),
+                endpoint: endpoint,
+                environment: metadata.environment,
+                verificationMode: metadata.verificationMode
+            )
             let (data, response) = try await urlSession.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw SubscriptionServiceError.invalidResponse
             }
+
+            logSubscriptionStage(
+                stage: responseStage(for: endpoint),
+                endpoint: endpoint,
+                environment: metadata.environment,
+                verificationMode: metadata.verificationMode,
+                httpStatus: httpResponse.statusCode,
+                topLevelKeys: topLevelJSONKeys(from: data)
+            )
 
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw SubscriptionServiceError.authenticationRequired
@@ -330,28 +382,89 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 #endif
     }
 
-    private func logSubscriptionRequestMetadata<T: Encodable>(endpoint: String, body: T) {
-#if DEBUG
+    private func requestMetadataContext<T: Encodable>(from body: T) -> SubscriptionRequestMetadata {
         if let validateRequest = body as? ValidateSubscriptionRequest {
-            let verification = validateRequest.verificationMode ?? "none"
-            let environment = validateRequest.entitlement.environment
-            print("[OneDone][Subscription] endpoint=\(endpoint) environment=\(environment) verification_mode=\(verification)")
-            return
+            return SubscriptionRequestMetadata(
+                environment: validateRequest.entitlement.environment,
+                verificationMode: validateRequest.verificationMode
+            )
         }
 
         if let restoreRequest = body as? RestorePurchasesRequest {
-            let verification = restoreRequest.verificationMode ?? "none"
             let environments = Set((restoreRequest.entitlements ?? []).map(\.environment))
-            let environment: String
+            let environment: String?
             if environments.count == 1, let single = environments.first {
                 environment = single
             } else if environments.isEmpty {
-                environment = "none"
+                environment = nil
             } else {
                 environment = "mixed"
             }
-            print("[OneDone][Subscription] endpoint=\(endpoint) environment=\(environment) verification_mode=\(verification)")
+
+            return SubscriptionRequestMetadata(
+                environment: environment,
+                verificationMode: restoreRequest.verificationMode
+            )
         }
+
+        return SubscriptionRequestMetadata(environment: nil, verificationMode: nil)
+    }
+
+    private func dispatchStage(for endpoint: String) -> String {
+        endpoint == "restore-purchases" ? "restore_backend_request_dispatching" : "backend_request_dispatching"
+    }
+
+    private func dispatchSkippedStage(for endpoint: String) -> String {
+        endpoint == "restore-purchases" ? "restore_backend_request_dispatching_skipped" : "backend_request_dispatching_skipped"
+    }
+
+    private func responseStage(for endpoint: String) -> String {
+        endpoint == "restore-purchases" ? "restore_backend_response_received" : "backend_response_received"
+    }
+
+    private func logSubscriptionStage(
+        stage: String,
+        endpoint: String? = nil,
+        environment: String? = nil,
+        verificationMode: String? = nil,
+        httpStatus: Int? = nil,
+        topLevelKeys: [String]? = nil,
+        entitlementsCount: Int? = nil,
+        transactionVerified: Bool? = nil
+    ) {
+#if DEBUG
+        var components: [String] = ["stage=\(stage)"]
+
+        if let endpoint {
+            components.append("endpoint=\(endpoint)")
+        }
+
+        if let environment {
+            components.append("environment=\(environment)")
+        }
+
+        if let verificationMode {
+            components.append("verification_mode=\(verificationMode)")
+        }
+
+        if let httpStatus {
+            components.append("status=\(httpStatus)")
+        }
+
+        if let topLevelKeys {
+            let keysValue = topLevelKeys.isEmpty ? "none" : topLevelKeys.joined(separator: ",")
+            components.append("keys=\(keysValue)")
+        }
+
+        if let entitlementsCount {
+            components.append("entitlements_count=\(entitlementsCount)")
+        }
+
+        if let transactionVerified {
+            components.append("transaction_verified=\(transactionVerified)")
+        }
+
+        print("[OneDone][Subscription] \(components.joined(separator: " "))")
 #endif
     }
 
@@ -394,15 +507,14 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
     private func logSubscriptionHTTPFailure(
         endpoint: String,
         statusCode: Int,
-        backendError: ParsedBackendError?,
+        backendError _: ParsedBackendError?,
         data: Data
     ) {
 #if DEBUG
         let keys = topLevelJSONKeys(from: data)
         let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        let codeValue = backendError?.code ?? "none"
-        let messageValue = backendError?.message ?? "none"
-        print("[OneDone][Subscription] endpoint=\(endpoint) status=\(statusCode) code=\(codeValue) message=\(messageValue) keys=\(keysDescription)")
+        let stage = responseStage(for: endpoint)
+        print("[OneDone][Subscription] stage=\(stage) endpoint=\(endpoint) status=\(statusCode) keys=\(keysDescription)")
 #endif
     }
 
@@ -445,6 +557,11 @@ private struct RemoteSubscriptionResponseWrapper<T: Decodable>: Decodable {
     let result: T?
     let response: T?
     let payload: T?
+}
+
+private struct SubscriptionRequestMetadata {
+    let environment: String?
+    let verificationMode: String?
 }
 
 private struct ParsedBackendError {
