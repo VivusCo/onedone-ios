@@ -150,7 +150,7 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             storeKitStatus: entitlementStatus(from: transaction),
             source: "app_store",
             platform: "ios",
-            environment: environmentLabel(from: transaction),
+            environment: normalizedEnvironment(from: transaction),
             storefront: nil
         )
     }
@@ -169,7 +169,7 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             storeKitStatus: entitlementStatus(from: transaction),
             source: "app_store",
             platform: "ios",
-            environment: environmentLabel(from: transaction),
+            environment: normalizedEnvironment(from: transaction),
             storefront: nil
         )
     }
@@ -315,8 +315,31 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         return nil
     }
 
-    private func environmentLabel(from transaction: Transaction) -> String {
-        String(describing: transaction.environment).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    private func normalizedEnvironment(from transaction: Transaction) -> String {
+        switch transaction.environment {
+        case .xcode:
+            return "xcode"
+        case .sandbox:
+            return isLikelyTestFlightBuild() ? "testflight" : "sandbox"
+        case .production:
+            // Backend currently accepts xcode/sandbox/testflight.
+            // If production is observed in this MVP flow, fall back conservatively.
+            return isLikelyTestFlightBuild() ? "testflight" : "sandbox"
+        default:
+            return "sandbox"
+        }
+    }
+
+    private func isLikelyTestFlightBuild() -> Bool {
+#if DEBUG
+        false
+#else
+#if targetEnvironment(simulator)
+        false
+#else
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+#endif
+#endif
     }
 
     private func edgeFunctionURL(endpoint: String) -> URL? {
