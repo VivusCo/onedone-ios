@@ -71,8 +71,9 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         }
 
         let entitlements = await collectVerifiedEntitlements()
-        let entitlementPayloads = entitlements.map(restoreEntitlementPayload(from:))
+        let entitlementPayloads = entitlements.map(subscriptionEntitlementPayload(from:))
         let request = RestorePurchasesRequest(
+            verificationMode: "ios_verified_mirror",
             entitlements: entitlementPayloads.isEmpty ? nil : entitlementPayloads
         )
 
@@ -138,29 +139,17 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 
     private func validateRequest(from transaction: Transaction) -> ValidateSubscriptionRequest {
         ValidateSubscriptionRequest(
-            transactionID: String(transaction.id),
-            originalTransactionID: String(transaction.originalID),
-            productID: transaction.productID,
             verificationMode: "ios_verified_mirror",
-            purchasedAtISO8601: ISO8601DateFormatter().string(from: transaction.purchaseDate),
-            expiresAtISO8601: transaction.expirationDate.map { ISO8601DateFormatter().string(from: $0) },
-            ownershipType: transaction.ownershipType.rawValue,
-            revocationDateISO8601: transaction.revocationDate.map { ISO8601DateFormatter().string(from: $0) },
-            entitlementStatus: entitlementStatus(from: transaction),
-            storeKitStatus: entitlementStatus(from: transaction),
-            source: "app_store",
-            platform: "ios",
-            environment: normalizedEnvironment(from: transaction),
-            storefront: nil
+            entitlement: subscriptionEntitlementPayload(from: transaction)
         )
     }
 
-    private func restoreEntitlementPayload(from transaction: Transaction) -> RestorePurchaseEntitlement {
-        RestorePurchaseEntitlement(
+    private func subscriptionEntitlementPayload(from transaction: Transaction) -> SubscriptionEntitlementPayload {
+        SubscriptionEntitlementPayload(
+            productID: transaction.productID,
             transactionID: String(transaction.id),
             originalTransactionID: String(transaction.originalID),
-            productID: transaction.productID,
-            verificationMode: "ios_verified_mirror",
+            environment: normalizedEnvironment(from: transaction),
             purchasedAtISO8601: ISO8601DateFormatter().string(from: transaction.purchaseDate),
             expiresAtISO8601: transaction.expirationDate.map { ISO8601DateFormatter().string(from: $0) },
             ownershipType: transaction.ownershipType.rawValue,
@@ -168,9 +157,7 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
             entitlementStatus: entitlementStatus(from: transaction),
             storeKitStatus: entitlementStatus(from: transaction),
             source: "app_store",
-            platform: "ios",
-            environment: normalizedEnvironment(from: transaction),
-            storefront: nil
+            platform: "ios"
         )
     }
 

@@ -595,11 +595,11 @@ struct GenerateReplyResponse: Decodable {
     }
 }
 
-struct ValidateSubscriptionRequest: Codable {
+struct SubscriptionEntitlementPayload: Codable {
+    var productID: String?
     var transactionID: String
     var originalTransactionID: String?
-    var productID: String?
-    var verificationMode: String?
+    var environment: String?
     var purchasedAtISO8601: String?
     var expiresAtISO8601: String?
     var ownershipType: String?
@@ -608,14 +608,12 @@ struct ValidateSubscriptionRequest: Codable {
     var storeKitStatus: String?
     var source: String?
     var platform: String?
-    var environment: String?
-    var storefront: String?
 
     enum CodingKeys: String, CodingKey {
+        case productID = "product_id"
         case transactionID = "transaction_id"
         case originalTransactionID = "original_transaction_id"
-        case productID = "product_id"
-        case verificationMode = "verification_mode"
+        case environment
         case purchasedAtISO8601 = "purchased_at"
         case expiresAtISO8601 = "expires_at"
         case ownershipType = "ownership_type"
@@ -624,8 +622,16 @@ struct ValidateSubscriptionRequest: Codable {
         case storeKitStatus = "storekit_status"
         case source
         case platform
-        case environment
-        case storefront
+    }
+}
+
+struct ValidateSubscriptionRequest: Codable {
+    var verificationMode: String?
+    var entitlement: SubscriptionEntitlementPayload
+
+    enum CodingKeys: String, CodingKey {
+        case verificationMode = "verification_mode"
+        case entitlement
     }
 }
 
@@ -652,44 +658,12 @@ struct ValidateSubscriptionResponse: Decodable {
 }
 
 struct RestorePurchasesRequest: Codable {
-    var entitlements: [RestorePurchaseEntitlement]?
-
-    enum CodingKeys: String, CodingKey {
-        case entitlements
-    }
-}
-
-struct RestorePurchaseEntitlement: Codable {
-    var transactionID: String
-    var originalTransactionID: String?
-    var productID: String?
     var verificationMode: String?
-    var purchasedAtISO8601: String?
-    var expiresAtISO8601: String?
-    var ownershipType: String?
-    var revocationDateISO8601: String?
-    var entitlementStatus: String?
-    var storeKitStatus: String?
-    var source: String?
-    var platform: String?
-    var environment: String?
-    var storefront: String?
+    var entitlements: [SubscriptionEntitlementPayload]?
 
     enum CodingKeys: String, CodingKey {
-        case transactionID = "transaction_id"
-        case originalTransactionID = "original_transaction_id"
-        case productID = "product_id"
         case verificationMode = "verification_mode"
-        case purchasedAtISO8601 = "purchased_at"
-        case expiresAtISO8601 = "expires_at"
-        case ownershipType = "ownership_type"
-        case revocationDateISO8601 = "revocation_date"
-        case entitlementStatus = "entitlement_status"
-        case storeKitStatus = "storekit_status"
-        case source
-        case platform
-        case environment
-        case storefront
+        case entitlements
     }
 }
 
