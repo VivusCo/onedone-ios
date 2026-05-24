@@ -599,6 +599,7 @@ struct ValidateSubscriptionRequest: Codable {
     var transactionID: String
     var originalTransactionID: String?
     var productID: String?
+    var verificationMode: String?
     var purchasedAtISO8601: String?
     var expiresAtISO8601: String?
     var ownershipType: String?
@@ -614,6 +615,7 @@ struct ValidateSubscriptionRequest: Codable {
         case transactionID = "transaction_id"
         case originalTransactionID = "original_transaction_id"
         case productID = "product_id"
+        case verificationMode = "verification_mode"
         case purchasedAtISO8601 = "purchased_at"
         case expiresAtISO8601 = "expires_at"
         case ownershipType = "ownership_type"
@@ -661,6 +663,7 @@ struct RestorePurchaseEntitlement: Codable {
     var transactionID: String
     var originalTransactionID: String?
     var productID: String?
+    var verificationMode: String?
     var purchasedAtISO8601: String?
     var expiresAtISO8601: String?
     var ownershipType: String?
@@ -676,6 +679,7 @@ struct RestorePurchaseEntitlement: Codable {
         case transactionID = "transaction_id"
         case originalTransactionID = "original_transaction_id"
         case productID = "product_id"
+        case verificationMode = "verification_mode"
         case purchasedAtISO8601 = "purchased_at"
         case expiresAtISO8601 = "expires_at"
         case ownershipType = "ownership_type"
