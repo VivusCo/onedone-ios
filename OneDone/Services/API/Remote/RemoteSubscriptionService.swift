@@ -193,6 +193,7 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        logSubscriptionRequestMetadata(endpoint: endpoint, body: body)
         request.httpBody = try JSONEncoder().encode(body)
 
         do {
@@ -326,6 +327,31 @@ struct RemoteSubscriptionService: SubscriptionServiceProtocol {
 #else
         Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
 #endif
+#endif
+    }
+
+    private func logSubscriptionRequestMetadata<T: Encodable>(endpoint: String, body: T) {
+#if DEBUG
+        if let validateRequest = body as? ValidateSubscriptionRequest {
+            let verification = validateRequest.verificationMode ?? "none"
+            let environment = validateRequest.entitlement.environment
+            print("[OneDone][Subscription] endpoint=\(endpoint) environment=\(environment) verification_mode=\(verification)")
+            return
+        }
+
+        if let restoreRequest = body as? RestorePurchasesRequest {
+            let verification = restoreRequest.verificationMode ?? "none"
+            let environments = Set((restoreRequest.entitlements ?? []).map(\.environment))
+            let environment: String
+            if environments.count == 1, let single = environments.first {
+                environment = single
+            } else if environments.isEmpty {
+                environment = "none"
+            } else {
+                environment = "mixed"
+            }
+            print("[OneDone][Subscription] endpoint=\(endpoint) environment=\(environment) verification_mode=\(verification)")
+        }
 #endif
     }
 

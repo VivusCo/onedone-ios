@@ -599,7 +599,7 @@ struct SubscriptionEntitlementPayload: Codable {
     var productID: String?
     var transactionID: String
     var originalTransactionID: String?
-    var environment: String?
+    var environment: String
     var purchasedAtISO8601: String?
     var expiresAtISO8601: String?
     var ownershipType: String?
