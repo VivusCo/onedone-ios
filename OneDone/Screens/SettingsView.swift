@@ -8,23 +8,20 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(title: "Settings", subtitle: "Account, preferences, and privacy")
+                ODSectionHeader(title: "Settings", subtitle: "Account, access, preferences, and privacy")
 
-                ODCard {
+                ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Account")
-                            .font(OneDoneStyle.cardTitleFont)
+                            .font(.system(size: 22, weight: .black, design: .rounded))
                             .foregroundStyle(ODColor.textPrimary)
 
-                        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .foregroundStyle(ODColor.primary)
-                                .padding(.top, 1)
-                            Text(appState.authenticatedUserEmail ?? "Not signed in")
-                                .font(OneDoneStyle.bodyFont)
-                                .foregroundStyle(ODColor.textSecondary)
-                                .textSelection(.enabled)
-                        }
+                        settingsInfoRow(
+                            icon: "person.crop.circle.fill",
+                            title: "Signed in as",
+                            detail: appState.authenticatedUserEmail ?? "Not signed in"
+                        )
+                        .textSelection(.enabled)
 
                         if appState.services.runtimeMode == .remoteAccessState {
                             HStack {
@@ -41,7 +38,7 @@ struct SettingsView: View {
                                         isLoggingOut = false
                                     }
                                 }
-                                .frame(maxWidth: 280)
+                                .frame(maxWidth: 260)
                                 Spacer(minLength: 0)
                             }
                             .padding(.top, OneDoneStyle.space4)
@@ -49,26 +46,47 @@ struct SettingsView: View {
                     }
                 }
 
-                ODCard {
+                ODCard(style: .default) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Preferences")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        Toggle("Reminders", isOn: $appState.remindersEnabled)
-                        Toggle("Haptics", isOn: $appState.hapticsEnabled)
-                        Toggle("Calm Mode", isOn: $appState.calmModeEnabled)
+                        settingsToggleRow(
+                            icon: "bell.fill",
+                            title: "Reminders",
+                            isOn: $appState.remindersEnabled
+                        )
+                        settingsToggleRow(
+                            icon: "waveform.path",
+                            title: "Haptics",
+                            isOn: $appState.hapticsEnabled
+                        )
+                        settingsToggleRow(
+                            icon: "leaf.fill",
+                            title: "Calm mode",
+                            isOn: $appState.calmModeEnabled
+                        )
                     }
                     .font(OneDoneStyle.bodyFont)
                     .foregroundStyle(ODColor.textPrimary)
                     .tint(ODColor.primary)
                 }
 
-                ODCard {
+                ODCard(style: .muted) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                         Text("Access")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
+
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            ODStatusBadge(
+                                title: appState.canCreateNewTasks ? "Creation available" : "Creation locked",
+                                tone: appState.canCreateNewTasks ? .success : .warning
+                            )
+                            Spacer(minLength: OneDoneStyle.space8)
+                        }
+
                         Text(appState.accessSummary)
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
@@ -100,6 +118,61 @@ struct SettingsView: View {
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+    }
+
+    private func settingsInfoRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: OneDoneStyle.space4) {
+                Text(title)
+                    .font(OneDoneStyle.captionFont.weight(.semibold))
+                    .foregroundStyle(ODColor.textSecondary)
+                    .textCase(.uppercase)
+                Text(detail)
+                    .font(OneDoneStyle.bodyFont)
+                    .foregroundStyle(ODColor.textPrimary)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+        .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+        .background(
+            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                .fill(ODColor.glassFillSecondary)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                .stroke(ODColor.glassBorder, lineWidth: 0.9)
+        )
+    }
+
+    private func settingsToggleRow(icon: String, title: String, isOn: Binding<Bool>) -> some View {
+        HStack(spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                .frame(width: 18, height: 18)
+
+            Toggle(title, isOn: isOn)
+                .toggleStyle(.switch)
+        }
+        .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+        .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+        .background(
+            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                .fill(ODColor.glassFillSecondary)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                .stroke(ODColor.glassBorder, lineWidth: 0.9)
+        )
     }
 }
 

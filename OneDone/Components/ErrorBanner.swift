@@ -35,7 +35,7 @@ enum ErrorBannerTone {
         case .warning:
             return ODColor.statusWarningFill
         case .critical:
-            return Color(red: 0.97, green: 0.86, blue: 0.82)
+            return Color(red: 0.96, green: 0.88, blue: 0.88)
         case .success:
             return ODColor.statusSuccessFill
         }
@@ -48,7 +48,7 @@ enum ErrorBannerTone {
         case .warning:
             return ODColor.accentWarmOrangeSoft
         case .critical:
-            return Color(red: 0.65, green: 0.22, blue: 0.17)
+            return Color(red: 0.64, green: 0.29, blue: 0.28)
         case .success:
             return ODColor.accentPrimaryDeepGreen
         }
@@ -64,10 +64,16 @@ struct ErrorBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: OneDoneStyle.contentSpacing) {
-            Image(systemName: tone.icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(tone.iconColor)
-                .padding(.top, 1)
+            ZStack {
+                Circle()
+                    .fill(tone.fill.opacity(0.95))
+                    .frame(width: 24, height: 24)
+
+                Image(systemName: tone.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(tone.iconColor)
+            }
+            .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: OneDoneStyle.space4) {
                 Text(title)
@@ -88,20 +94,22 @@ struct ErrorBanner: View {
                 }
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                        .fill(tone.fill.opacity(0.85))
+                    RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
+                        .fill(tone.fill.opacity(0.74))
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
                 .stroke(ODColor.glassBorder, lineWidth: 0.9)
         )
+        .shadow(color: ODColor.glassShadow.opacity(0.2), radius: 8, x: 0, y: 4)
     }
 }
 
