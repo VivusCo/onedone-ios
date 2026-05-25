@@ -2,9 +2,10 @@ import SwiftUI
 
 enum ODColor {
     // MARK: - Base Canvas (warm / calm)
-    static let backgroundWarm = Color(red: 0.97, green: 0.95, blue: 0.91)
-    static let backgroundAccentRadialA = Color(red: 0.34, green: 0.58, blue: 0.45).opacity(0.22)
-    static let backgroundAccentRadialB = Color(red: 0.90, green: 0.66, blue: 0.40).opacity(0.18)
+    static let backgroundWarm = Color(red: 0.975, green: 0.954, blue: 0.918)
+    static let backgroundAccentRadialA = Color(red: 0.31, green: 0.55, blue: 0.43).opacity(0.26)
+    static let backgroundAccentRadialB = Color(red: 0.89, green: 0.65, blue: 0.39).opacity(0.21)
+    static let backgroundAccentRadialC = Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.18)
 
     // MARK: - Glass Surfaces
     static let glassFillPrimary = Color.white.opacity(0.50)
@@ -51,19 +52,38 @@ struct ODWarmRadialBackground: View {
         ZStack {
             ODColor.backgroundWarm
 
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.20),
+                    Color.clear,
+                    Color.white.opacity(0.10)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .blendMode(.normal)
+
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialA, .clear],
                 center: .topLeading,
-                startRadius: 20,
-                endRadius: 420
+                startRadius: 10,
+                endRadius: 520
             )
             .blendMode(.normal)
 
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialB, .clear],
                 center: .bottomTrailing,
-                startRadius: 30,
-                endRadius: 380
+                startRadius: 16,
+                endRadius: 460
+            )
+            .blendMode(.normal)
+
+            RadialGradient(
+                colors: [ODColor.backgroundAccentRadialC, .clear],
+                center: .topTrailing,
+                startRadius: 12,
+                endRadius: 340
             )
             .blendMode(.normal)
         }

@@ -6,7 +6,7 @@ struct AppFlow: View {
 
     var body: some View {
         ZStack {
-            ODColor.background.ignoresSafeArea()
+            ODWarmRadialBackground()
 
             switch appState.phase {
             case .auth:
@@ -104,13 +104,18 @@ private struct MainTabShell: View {
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarColorScheme(.light, for: .tabBar)
         .overlay(alignment: .bottom) {
-            ElevatedTaskTabButton(
-                title: "Task",
-                accessibilityLabel: "Create task"
-            ) {
-                showTaskComposer = true
+            HStack {
+                Spacer(minLength: 0)
+                ElevatedTaskTabButton(
+                    title: "Task",
+                    accessibilityLabel: "Create task"
+                ) {
+                    showTaskComposer = true
+                }
+                Spacer(minLength: 0)
             }
-            .padding(.bottom, 8)
+            .padding(.horizontal, OneDoneStyle.space16)
+            .padding(.bottom, 6)
         }
         .sheet(isPresented: $showTaskComposer) {
             NavigationStack {
