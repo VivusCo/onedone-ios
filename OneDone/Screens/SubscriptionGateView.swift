@@ -9,6 +9,8 @@ struct SubscriptionGateView: View {
     @State private var linkFeedback: SubscriptionGateFeedback?
     @State private var isProcessing: Bool = false
 
+    private let actionMaxWidth: CGFloat = 340
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
@@ -22,20 +24,18 @@ struct SubscriptionGateView: View {
                         Text(subtext)
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
+
+                        if isLockedState {
+                            Divider()
+                                .overlay(ODColor.border.opacity(0.5))
+                                .padding(.vertical, 2)
+
+                            Text("You can still view your existing tasks and task details while creation is locked.")
+                                .font(OneDoneStyle.subheadlineFont)
+                                .foregroundStyle(ODColor.textPrimary)
+                        }
                     }
                 }
-
-                ODPrimaryButton(
-                    title: ctaTitle,
-                    icon: "sparkles",
-                    isDisabled: isCTAButtonDisabled || isProcessing
-                ) {
-                    Task {
-                        await handleCTAAction()
-                    }
-                }
-
-                secondaryLinks
 
                 if isProcessing {
                     HStack(spacing: OneDoneStyle.tightSpacing) {
@@ -45,7 +45,34 @@ struct SubscriptionGateView: View {
                             .font(OneDoneStyle.subheadlineFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
+
+                centeredAction {
+                    ODPrimaryButton(
+                        title: ctaTitle,
+                        icon: "sparkles",
+                        isDisabled: isCTAButtonDisabled || isProcessing
+                    ) {
+                        Task {
+                            await handleCTAAction()
+                        }
+                    }
+                }
+
+                centeredAction {
+                    ODSecondaryButton(
+                        title: "Restore Purchases",
+                        icon: "arrow.clockwise",
+                        isDisabled: isProcessing
+                    ) {
+                        Task {
+                            await handleRestorePurchases()
+                        }
+                    }
+                }
+
+                legalLinks
 
                 if let linkFeedback {
                     ODInfoBanner(
@@ -58,7 +85,7 @@ struct SubscriptionGateView: View {
             }
             .padding(OneDoneStyle.screenPadding)
         }
-        .navigationTitle("Access Gate")
+        .navigationTitle("Subscription")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
     }
@@ -87,7 +114,7 @@ struct SubscriptionGateView: View {
         case .starter_expired, .trial_not_started:
             return "Your Starter Access has ended. Start your 14-day App Store trial to keep using task breakdowns, replies, reminders, and follow-ups."
         case .billing_issue:
-            return "Creation is temporarily locked in this mock billing issue state. Resolve billing to continue creating new tasks."
+            return "Creation is temporarily locked while billing is resolved."
         case .trial_expired:
             return "Your trial has ended. Start your App Store subscription to continue creating new tasks."
         case .subscription_expired:
@@ -116,6 +143,15 @@ struct SubscriptionGateView: View {
         }
     }
 
+    private var isLockedState: Bool {
+        switch accessState {
+        case .starter_expired, .trial_not_started, .billing_issue, .trial_expired, .subscription_expired:
+            return true
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period, .onboarding_required, .unauthenticated:
+            return false
+        }
+    }
+
     private var isCTAButtonDisabled: Bool {
         if appState.shouldUseRemoteSubscriptionFlow {
             switch accessState {
@@ -140,43 +176,47 @@ struct SubscriptionGateView: View {
         }
     }
 
-    private var secondaryLinks: some View {
-        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+    private var legalLinks: some View {
+        VStack(spacing: OneDoneStyle.tightSpacing) {
             Button {
-                Task {
-                    await handleRestorePurchases()
-                }
+                linkFeedback = SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Terms of Use is a placeholder link in this prototype.",
+                    shouldCloseGate: false
+                )
             } label: {
-                Text("Restore Purchases")
+                Text("Terms of Use")
                     .font(OneDoneStyle.subheadlineFont.weight(.semibold))
                     .foregroundStyle(ODColor.primary)
+                    .underline()
             }
             .buttonStyle(.plain)
-            .disabled(isProcessing)
 
-            Text("Terms of Use")
-                .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                .foregroundStyle(ODColor.primary)
-                .onTapGesture {
-                    linkFeedback = SubscriptionGateFeedback(
-                        kind: .info,
-                        message: "Terms of Use is a placeholder link in this prototype.",
-                        shouldCloseGate: false
-                    )
-                }
-
-            Text("Privacy Policy")
-                .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                .foregroundStyle(ODColor.primary)
-                .onTapGesture {
-                    linkFeedback = SubscriptionGateFeedback(
-                        kind: .info,
-                        message: "Privacy Policy is a placeholder link in this prototype.",
-                        shouldCloseGate: false
-                    )
-                }
+            Button {
+                linkFeedback = SubscriptionGateFeedback(
+                    kind: .info,
+                    message: "Privacy Policy is a placeholder link in this prototype.",
+                    shouldCloseGate: false
+                )
+            } label: {
+                Text("Privacy Policy")
+                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                    .foregroundStyle(ODColor.primary)
+                    .underline()
+            }
+            .buttonStyle(.plain)
         }
-        .padding(.top, 4)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, OneDoneStyle.space4)
+    }
+
+    private func centeredAction<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            content()
+                .frame(maxWidth: actionMaxWidth)
+            Spacer(minLength: 0)
+        }
     }
 
     @MainActor
