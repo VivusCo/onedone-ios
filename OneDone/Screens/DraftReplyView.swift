@@ -13,10 +13,11 @@ struct DraftReplyView: View {
     @State private var didCopy: Bool = false
     @State private var showPostCopyPrompt: Bool = false
     @State private var showFollowUpReminderFlow: Bool = false
-    @State private var reminderConfirmation: String?
+    @State private var reminderFeedback: ReminderActionFeedback?
     @State private var actionFeedback: String?
     @State private var isSyncActionInProgress: Bool = false
     @State private var isRegeneratingReply: Bool = false
+    @State private var showSubscriptionGate: Bool = false
 
     private var task: MockTask? {
         appState.task(for: taskID)
@@ -45,12 +46,12 @@ struct DraftReplyView: View {
                         followUpReminderSection
                     }
 
-                    if let reminderConfirmation {
+                    if let reminderFeedback {
                         ODInfoBanner(
-                            title: "Reminder saved",
-                            message: reminderConfirmation,
-                            icon: "checkmark.circle.fill",
-                            tone: .success
+                            title: reminderFeedbackTitle(reminderFeedback),
+                            message: reminderFeedback.message,
+                            icon: reminderFeedbackIcon(reminderFeedback),
+                            tone: reminderFeedbackTone(reminderFeedback)
                         )
                     }
 
@@ -75,6 +76,14 @@ struct DraftReplyView: View {
         .navigationTitle("Draft Reply")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
+        .sheet(isPresented: $showSubscriptionGate) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showSubscriptionGate = false
+            }
+        }
         .onAppear {
             guard let task else { return }
             if subject.isEmpty {
@@ -194,6 +203,11 @@ struct DraftReplyView: View {
                 icon: "arrow.clockwise",
                 isDisabled: isRegeneratingReply || isSyncActionInProgress
             ) {
+                guard appState.canCreateNewTasks else {
+                    showSubscriptionGate = true
+                    return
+                }
+
                 Task {
                     await regenerateDraft()
                 }
@@ -264,7 +278,7 @@ struct DraftReplyView: View {
     private func reminderButton(title: String, hours: Int) -> some View {
         Button {
             Task {
-                await setFollowUpReminder(hours: hours, title: title)
+                await setFollowUpReminder(hours: hours)
             }
         } label: {
             Text(title)
@@ -286,6 +300,7 @@ struct DraftReplyView: View {
         didCopy = true
         showPostCopyPrompt = true
         showFollowUpReminderFlow = false
+        reminderFeedback = nil
         actionFeedback = nil
     }
 
@@ -301,6 +316,11 @@ struct DraftReplyView: View {
     @MainActor
     private func regenerateDraft() async {
         guard !isRegeneratingReply else { return }
+        guard appState.canCreateNewTasks else {
+            showSubscriptionGate = true
+            return
+        }
+
         isRegeneratingReply = true
         actionFeedback = nil
         defer { isRegeneratingReply = false }
@@ -361,7 +381,7 @@ struct DraftReplyView: View {
         }
         showPostCopyPrompt = false
         showFollowUpReminderFlow = true
-        reminderConfirmation = nil
+        reminderFeedback = nil
     }
 
     @MainActor
@@ -372,19 +392,52 @@ struct DraftReplyView: View {
             on: reminderDate,
             context: "Reminder from Draft Reply: send this message."
         )
-        reminderConfirmation = feedback.message
+        reminderFeedback = feedback
         showPostCopyPrompt = false
     }
 
     @MainActor
-    private func setFollowUpReminder(hours: Int, title: String) async {
+    private func setFollowUpReminder(hours: Int) async {
         let reminderDate = Calendar.current.date(byAdding: .hour, value: hours, to: Date()) ?? Date().addingTimeInterval(Double(hours) * 3600)
         let feedback = await appState.scheduleTaskReminder(
             taskID,
             on: reminderDate,
             context: "Follow-up reminder after sent reply."
         )
-        reminderConfirmation = feedback.kind == .success ? "Follow-up reminder set for \(title.lowercased())." : feedback.message
+        reminderFeedback = feedback
+    }
+
+    private func reminderFeedbackTitle(_ feedback: ReminderActionFeedback) -> String {
+        switch feedback.kind {
+        case .success:
+            return "Reminder saved"
+        case .info:
+            return "Reminder"
+        case .warning:
+            return "Reminder issue"
+        }
+    }
+
+    private func reminderFeedbackTone(_ feedback: ReminderActionFeedback) -> ODStatusTone {
+        switch feedback.kind {
+        case .success:
+            return .success
+        case .info:
+            return .neutral
+        case .warning:
+            return .warning
+        }
+    }
+
+    private func reminderFeedbackIcon(_ feedback: ReminderActionFeedback) -> String {
+        switch feedback.kind {
+        case .success:
+            return "checkmark.circle.fill"
+        case .info:
+            return "info.circle.fill"
+        case .warning:
+            return "bell.slash"
+        }
     }
 
     private func regenerateMessage(base: String, tone: ReplyTone, language: ReplyLanguage) -> String {
