@@ -7,6 +7,8 @@ struct MyTasksView: View {
     @State private var isLoadingRemoteTasks: Bool = false
     @State private var remoteLoadErrorMessage: String?
     @State private var hasTriggeredInitialRemoteLoad: Bool = false
+    @State private var showCreateTask: Bool = false
+    @State private var showSubscriptionGate: Bool = false
 
     var body: some View {
         ScrollView {
@@ -67,15 +69,42 @@ struct MyTasksView: View {
                 }
 
                 if filteredAndSortedTasks.isEmpty {
-                    ODCard(style: .muted) {
-                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                            Text("No tasks in this view")
-                                .font(OneDoneStyle.cardTitleFont)
-                                .foregroundStyle(ODColor.textPrimary)
+                    if selectedFilter == .all {
+                        VStack(spacing: OneDoneStyle.sectionSpacing) {
+                            IllustrationCard(
+                                title: "Nothing here yet",
+                                subtitle: "Tap the Task button to turn one messy thing into a clear plan.",
+                                variant: .calm,
+                                minHeight: 118
+                            )
 
-                            Text(emptyStateText)
-                                .font(OneDoneStyle.bodyFont)
-                                .foregroundStyle(ODColor.textSecondary)
+                            ODCard(style: .muted) {
+                                Text(emptyStateText)
+                                    .font(OneDoneStyle.bodyFont)
+                                    .foregroundStyle(ODColor.textSecondary)
+                            }
+
+                            HStack {
+                                Spacer(minLength: 0)
+                                ODPrimaryButton(title: "Create first task", icon: "sparkles") {
+                                    handleEmptyStateCreateTap()
+                                }
+                                .frame(maxWidth: 260)
+                                Spacer(minLength: 0)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        ODCard(style: .muted) {
+                            VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                                Text("No tasks in this view")
+                                    .font(OneDoneStyle.cardTitleFont)
+                                    .foregroundStyle(ODColor.textPrimary)
+
+                                Text(emptyStateText)
+                                    .font(OneDoneStyle.bodyFont)
+                                    .foregroundStyle(ODColor.textSecondary)
+                            }
                         }
                     }
                 } else {
@@ -104,6 +133,17 @@ struct MyTasksView: View {
         }
         .navigationTitle("My Tasks")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showCreateTask) {
+            NewTaskView(appState: appState, prefilledPrompt: nil)
+        }
+        .sheet(isPresented: $showSubscriptionGate) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showSubscriptionGate = false
+            }
+        }
         .oneDoneScreen()
         .refreshable {
             await refreshRemoteTasks(showLoading: false)
@@ -257,6 +297,14 @@ struct MyTasksView: View {
         let loadError = await appState.refreshTasksFromRemote()
         remoteLoadErrorMessage = loadError
         isLoadingRemoteTasks = false
+    }
+
+    private func handleEmptyStateCreateTap() {
+        if appState.canCreateNewTasks {
+            showCreateTask = true
+        } else {
+            showSubscriptionGate = true
+        }
     }
 }
 
