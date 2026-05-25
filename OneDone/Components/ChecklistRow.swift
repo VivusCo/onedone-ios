@@ -15,6 +15,8 @@ struct ChecklistRow: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!isEnabled)
+                .accessibilityHint(isChecked ? "Double tap to mark unchecked" : "Double tap to mark checked")
+                .accessibilityAddTraits(.isButton)
             } else {
                 rowContent
             }
