@@ -12,26 +12,36 @@ struct ODSecondaryButton: View {
             HStack(spacing: OneDoneStyle.contentSpacing) {
                 if let icon {
                     Image(systemName: icon)
+                        .font(.system(size: 14, weight: .semibold))
                 }
 
                 Text(title)
-                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                    .font(OneDoneStyle.buttonFont)
+                    .lineLimit(1)
             }
-            .foregroundStyle(isDisabled ? ODColor.textMuted : ODColor.primary)
+            .foregroundStyle(isDisabled ? ODColor.textTertiary : ODColor.accentPrimaryDeepGreen)
             .padding(.vertical, OneDoneStyle.buttonVerticalPadding)
             .frame(maxWidth: fullWidth ? .infinity : nil)
             .padding(.horizontal, fullWidth ? 0 : 14)
-            .background(
-                RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .fill(ODColor.surfaceStrong)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .stroke(isDisabled ? ODColor.border.opacity(0.6) : ODColor.border, lineWidth: 1)
-            )
+            .background(buttonBackground)
+            .clipShape(RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var buttonBackground: some View {
+        RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
+                    .fill(ODColor.glassFillSecondary)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
+                    .stroke(isDisabled ? ODColor.border.opacity(0.6) : ODColor.glassBorder, lineWidth: 1)
+            )
     }
 }
 

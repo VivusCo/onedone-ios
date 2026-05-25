@@ -2,25 +2,23 @@ import SwiftUI
 
 struct ODCard<Content: View>: View {
     var contentPadding: CGFloat = OneDoneStyle.cardPadding
+    var style: GlassCardStyle = .default
     private let content: Content
 
-    init(contentPadding: CGFloat = OneDoneStyle.cardPadding, @ViewBuilder content: () -> Content) {
+    init(
+        contentPadding: CGFloat = OneDoneStyle.cardPadding,
+        style: GlassCardStyle = .default,
+        @ViewBuilder content: () -> Content
+    ) {
         self.contentPadding = contentPadding
+        self.style = style
         self.content = content()
     }
 
     var body: some View {
-        content
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(contentPadding)
-            .background(
-                RoundedRectangle(cornerRadius: OneDoneStyle.cardCornerRadius, style: .continuous)
-                    .fill(ODColor.surface)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: OneDoneStyle.cardCornerRadius, style: .continuous)
-                    .stroke(ODColor.border, lineWidth: 1)
-            )
+        GlassCard(style: style, contentPadding: contentPadding) {
+            content
+        }
     }
 }
 
