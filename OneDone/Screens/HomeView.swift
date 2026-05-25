@@ -4,18 +4,42 @@ import Observation
 struct HomeView: View {
     @Bindable var appState: AppState
 
-    @State private var taskInput: String = ""
-    @State private var showNewTaskFromInput: Bool = false
     @State private var selectedQuickActionTemplate: TaskTemplate?
     @State private var showSubscriptionGate: Bool = false
 
-    private let quickActionLabels: [String] = [
-        "Cancel a subscription",
-        "Return an item",
-        "Request a refund",
-        "Understand a bill",
-        "Write a complaint",
-        "Reply to a message"
+    private let shortcuts: [HomeShortcut] = [
+        HomeShortcut(
+            title: "Cancel subscription",
+            subtitle: "Stop recurring charges with clear steps.",
+            icon: "xmark.circle",
+            templateTitle: "Cancel a subscription",
+            backendTemplateID: "cancel_subscription",
+            fallbackPrompt: "Help me cancel a subscription and confirm I will not be billed again."
+        ),
+        HomeShortcut(
+            title: "Request refund",
+            subtitle: "Write a calm request with the right details.",
+            icon: "creditcard.and.123",
+            templateTitle: "Request a refund",
+            backendTemplateID: "request_refund",
+            fallbackPrompt: "Draft a refund request with clear facts and the refund amount."
+        ),
+        HomeShortcut(
+            title: "Understand bill",
+            subtitle: "Break down charges in plain language.",
+            icon: "doc.text.magnifyingglass",
+            templateTitle: "Understand a bill",
+            backendTemplateID: "understand_bill",
+            fallbackPrompt: "Paste the bill text and explain each line item clearly."
+        ),
+        HomeShortcut(
+            title: "Reply politely",
+            subtitle: "Draft a clear, respectful response.",
+            icon: "bubble.left.and.text.bubble.right",
+            templateTitle: "Reply to a message",
+            backendTemplateID: "reply_to_message",
+            fallbackPrompt: "Help me write a polite reply to this message with one clear next step."
+        )
     ]
 
     var body: some View {
@@ -37,13 +61,20 @@ struct HomeView: View {
                     )
                 }
 
-                mainInputCard
+                IllustrationCard(
+                    title: "One small thing, done.",
+                    subtitle: "Pick a shortcut below or tap the Task button to start from scratch.",
+                    variant: .calm,
+                    minHeight: 126
+                )
+
+                nextUpSection
 
                 if appState.showsAccessGateForCreation {
                     VStack(spacing: OneDoneStyle.contentSpacing) {
                         ODInfoBanner(
                             title: "Creation is locked",
-                            message: "You can still view existing tasks and details. New task creation is gated in this access state.",
+                            message: "You can still view existing tasks and details. Start trial or restore access to create new tasks.",
                             icon: "lock.fill",
                             tone: .warning
                         )
@@ -60,9 +91,6 @@ struct HomeView: View {
         }
         .navigationTitle("OneDone")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(isPresented: $showNewTaskFromInput) {
-            NewTaskView(appState: appState, prefilledPrompt: taskInput.isBlank ? nil : taskInput)
-        }
         .navigationDestination(item: $selectedQuickActionTemplate) { template in
             NewTaskView(
                 appState: appState,
@@ -87,10 +115,10 @@ struct HomeView: View {
     }
 
     private var headerBar: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: OneDoneStyle.contentSpacing) {
             ODSectionHeader(
-                title: "Home",
-                subtitle: "Start with one task"
+                title: "Welcome",
+                subtitle: "Overview and shortcuts"
             )
 
             Spacer()
@@ -101,61 +129,56 @@ struct HomeView: View {
                 .padding(10)
                 .background(
                     Circle()
-                        .fill(ODColor.surfaceStrong)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Circle()
+                                .stroke(ODColor.glassBorder, lineWidth: 0.85)
+                        )
                 )
                 .accessibilityLabel("Notifications")
         }
     }
 
-    private var mainInputCard: some View {
-        ODCard {
-            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                Text("What do you need to deal with?")
-                    .font(OneDoneStyle.cardTitleFont)
-                    .foregroundStyle(ODColor.textPrimary)
+    @ViewBuilder
+    private var nextUpSection: some View {
+        if let nextUpTask {
+            ODCard(contentPadding: 14, style: .strong) {
+                VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                    Text("Next up")
+                        .font(OneDoneStyle.captionFont.weight(.semibold))
+                        .foregroundStyle(ODColor.accentPrimaryDeepGreen)
 
-                TextEditor(text: $taskInput)
-                    .font(OneDoneStyle.bodyFont)
-                    .frame(minHeight: 120)
-                    .padding(8)
-                    .background(
-                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                            .fill(ODColor.surface)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                            .stroke(ODColor.border, lineWidth: 1)
-                    )
-                    .overlay(alignment: .topLeading) {
-                        if taskInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text("What do you need to deal with?")
-                                .font(OneDoneStyle.bodyFont)
-                                .foregroundStyle(ODColor.textMuted)
-                                .padding(.horizontal, 13)
-                                .padding(.vertical, 16)
-                        }
+                    Text(nextUpTask.title)
+                        .font(OneDoneStyle.cardTitleFont)
+                        .foregroundStyle(ODColor.textPrimary)
+                        .lineLimit(2)
+
+                    Text(nextUpTask.currentNextStep)
+                        .font(OneDoneStyle.subheadlineFont)
+                        .foregroundStyle(ODColor.textSecondary)
+                        .lineLimit(2)
+
+                    if let dateText = scheduleText(for: nextUpTask) {
+                        Label(dateText, systemImage: "calendar")
+                            .font(OneDoneStyle.captionFont)
+                            .foregroundStyle(ODColor.textSecondary)
                     }
+                }
+            }
+        } else {
+            ODCard(contentPadding: 14, style: .muted) {
+                VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                    Text("Next up")
+                        .font(OneDoneStyle.captionFont.weight(.semibold))
+                        .foregroundStyle(ODColor.accentPrimaryDeepGreen)
 
-                Text("Paste a message, bill, document text, or describe the task.")
-                    .font(OneDoneStyle.subheadlineFont)
-                    .foregroundStyle(ODColor.textSecondary)
+                    Text("No active task yet")
+                        .font(OneDoneStyle.cardTitleFont)
+                        .foregroundStyle(ODColor.textPrimary)
 
-                HStack(alignment: .center) {
-                    ODComingSoonBadge(text: "Attachments coming soon")
-
-                    Spacer()
-
-                    ODPrimaryButton(
-                        title: "Send task",
-                        icon: "arrow.right",
-                        fullWidth: false
-                    ) {
-                        if appState.canCreateNewTasks {
-                            showNewTaskFromInput = true
-                        } else {
-                            showSubscriptionGate = true
-                        }
-                    }
+                    Text("Tap the Task button below to create your first task.")
+                        .font(OneDoneStyle.subheadlineFont)
+                        .foregroundStyle(ODColor.textSecondary)
                 }
             }
         }
@@ -163,69 +186,122 @@ struct HomeView: View {
 
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-            Text("Quick actions")
+            Text("Quick shortcuts")
                 .font(OneDoneStyle.cardTitleFont)
                 .foregroundStyle(ODColor.textPrimary)
 
-            ForEach(quickActionLabels, id: \.self) { label in
-                if let template = template(for: label) {
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: OneDoneStyle.contentSpacing) {
+                ForEach(shortcuts) { shortcut in
                     Button {
-                        if appState.canCreateNewTasks {
-                            selectedQuickActionTemplate = template
-                        } else {
-                            showSubscriptionGate = true
-                        }
+                        handleShortcutTap(shortcut)
                     } label: {
-                        ODCard(contentPadding: 14) {
-                            HStack {
-                                Text(label)
+                        GlassCard(contentPadding: 14) {
+                            VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                                HStack {
+                                    Image(systemName: shortcut.icon)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(ODColor.primary)
+
+                                    Spacer(minLength: 8)
+
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(ODColor.primary)
+                                }
+
+                                Text(shortcut.title)
                                     .font(OneDoneStyle.subheadlineFont.weight(.semibold))
                                     .foregroundStyle(ODColor.textPrimary)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(2)
 
-                                Spacer()
-
-                                Image(systemName: "arrow.up.right")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(ODColor.primary)
+                                Text(shortcut.subtitle)
+                                    .font(OneDoneStyle.captionFont)
+                                    .foregroundStyle(ODColor.textSecondary)
+                                    .multilineTextAlignment(.leading)
+                                    .lineLimit(3)
                             }
+                            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
                         }
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(shortcut.title)
                 }
             }
         }
     }
 
-    private func template(for label: String) -> TaskTemplate? {
-        let desiredTitle = label.lowercased()
-
-        if let exact = appState.templates.first(where: { $0.title.lowercased() == desiredTitle }) {
-            return exact
+    private func handleShortcutTap(_ shortcut: HomeShortcut) {
+        if appState.canCreateNewTasks {
+            selectedQuickActionTemplate = template(for: shortcut)
+            return
         }
 
-        let generatedHint: String
-        switch label {
-        case "Cancel a subscription":
-            generatedHint = "Help me write a clear cancellation request for a subscription and ask for confirmation."
-        case "Return an item":
-            generatedHint = "Draft a return request message for an item I purchased, including order details and preferred resolution."
-        case "Request a refund":
-            generatedHint = "Write a calm refund request that explains the issue and asks for a timeline."
-        case "Understand a bill":
-            generatedHint = "Paste the bill text and help me understand each charge in plain language."
-        case "Write a complaint":
-            generatedHint = "Draft a respectful complaint message with clear facts and a desired outcome."
-        case "Reply to a message":
-            generatedHint = "Paste the message text and draft a concise reply with one clear next step."
-        default:
-            generatedHint = "Help me with this task."
+        showSubscriptionGate = true
+    }
+
+    private func template(for shortcut: HomeShortcut) -> TaskTemplate {
+        if let existing = appState.templates.first(where: { $0.title.lowercased() == shortcut.templateTitle.lowercased() }) {
+            return TaskTemplate(
+                title: shortcut.title,
+                promptHint: existing.promptHint,
+                focus: existing.focus,
+                backendTemplateID: existing.resolvedBackendTemplateID
+            )
         }
 
         return TaskTemplate(
-            title: label,
-            promptHint: generatedHint,
-            focus: "Clear and actionable"
+            title: shortcut.title,
+            promptHint: shortcut.fallbackPrompt,
+            focus: "Clear and actionable",
+            backendTemplateID: shortcut.backendTemplateID
         )
+    }
+
+    private var nextUpTask: MockTask? {
+        appState.tasks
+            .filter { $0.status != .done }
+            .sorted { lhs, rhs in
+                if lhs.status.sortPriority != rhs.status.sortPriority {
+                    return lhs.status.sortPriority < rhs.status.sortPriority
+                }
+
+                let lhsDate = lhs.reminderDate ?? lhs.dueDate
+                let rhsDate = rhs.reminderDate ?? rhs.dueDate
+
+                switch (lhsDate, rhsDate) {
+                case let (left?, right?):
+                    if left != right {
+                        return left < right
+                    }
+                case (.some, .none):
+                    return true
+                case (.none, .some):
+                    return false
+                case (.none, .none):
+                    break
+                }
+
+                return lhs.createdAt > rhs.createdAt
+            }
+            .first
+    }
+
+    private func scheduleText(for task: MockTask) -> String? {
+        if let reminderDate = task.reminderDate {
+            return "Reminder \(dateFormatter.string(from: reminderDate))"
+        }
+        if let dueDate = task.dueDate {
+            return "Due \(dateFormatter.string(from: dueDate))"
+        }
+        return nil
+    }
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
     }
 
     private var accessIndicatorTitle: String {
@@ -280,10 +356,15 @@ struct HomeView: View {
     }
 }
 
-private extension String {
-    var isBlank: Bool {
-        trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+private struct HomeShortcut: Identifiable {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let templateTitle: String
+    let backendTemplateID: String
+    let fallbackPrompt: String
+
+    var id: String { title }
 }
 
 #Preview {

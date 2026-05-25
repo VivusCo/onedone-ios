@@ -31,8 +31,15 @@ struct NewTaskView: View {
                     subtitle: "Describe one task in plain text"
                 )
 
+                ODInfoBanner(
+                    title: "Text-first MVP",
+                    message: "Paste a message, bill text, or describe the task clearly. Attachments and OCR are not available yet.",
+                    icon: "text.alignleft",
+                    tone: .neutral
+                )
+
                 if let selectedTemplate {
-                    ODCard {
+                    ODCard(style: .strong) {
                         VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                             Text("Template")
                                 .font(OneDoneStyle.captionFont.weight(.semibold))
@@ -47,15 +54,22 @@ struct NewTaskView: View {
                     }
                 }
 
+                IllustrationCard(
+                    title: "Start with one clear task",
+                    subtitle: "The more specific your description, the better the next steps.",
+                    variant: .focused,
+                    minHeight: 118
+                )
+
                 ODCard {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text("Task prompt")
+                        Text("Task description")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         TextEditor(text: $prompt)
                             .font(OneDoneStyle.bodyFont)
-                            .frame(minHeight: 140)
+                            .frame(minHeight: 220)
                             .padding(8)
                             .background(
                                 RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
@@ -65,24 +79,44 @@ struct NewTaskView: View {
                                 RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
                                     .stroke(ODColor.border, lineWidth: 1)
                             )
+                            .overlay(alignment: .topLeading) {
+                                if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    Text("What do you need to deal with?")
+                                        .font(OneDoneStyle.bodyFont)
+                                        .foregroundStyle(ODColor.textTertiary)
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 16)
+                                }
+                            }
 
-                        ODComingSoonBadge(text: "Attachments coming soon")
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            ODComingSoonBadge(text: "Attachments coming soon")
+
+                            Text("Paste text only in MVP")
+                                .font(OneDoneStyle.captionFont)
+                                .foregroundStyle(ODColor.textSecondary)
+                        }
                     }
                 }
 
-                ODPrimaryButton(
-                    title: "Analyze Task",
-                    icon: "arrow.right",
-                    isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
-                ) {
-                    guard appState.canCreateNewTasks else {
-                        showSubscriptionGate = true
-                        return
-                    }
+                HStack {
+                    Spacer(minLength: 0)
+                    ODPrimaryButton(
+                        title: "Analyze Task",
+                        icon: "arrow.right",
+                        isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
+                    ) {
+                        guard appState.canCreateNewTasks else {
+                            showSubscriptionGate = true
+                            return
+                        }
 
-                    Task {
-                        await submitTaskAnalysis(retryLast: false)
+                        Task {
+                            await submitTaskAnalysis(retryLast: false)
+                        }
                     }
+                    .frame(maxWidth: 360)
+                    Spacer(minLength: 0)
                 }
 
                 if isSubmitting {
