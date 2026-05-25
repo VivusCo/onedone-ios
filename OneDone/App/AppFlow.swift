@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import UIKit
 
 struct AppFlow: View {
     @Bindable var appState: AppState
@@ -99,28 +100,92 @@ private struct MainTabShell: View {
             }
             .tag(AppTab.settings)
         }
-        .tint(ODColor.primary)
-        .toolbarBackground(.visible, for: .tabBar)
-        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
-        .toolbarColorScheme(.light, for: .tabBar)
-        .overlay(alignment: .bottom) {
-            HStack {
-                Spacer(minLength: 0)
+        .toolbar(.hidden, for: .tabBar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ZStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: OneDoneStyle.radius24 + 10, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.radius24 + 10, style: .continuous)
+                            .fill(ODColor.glassFillPrimary.opacity(0.78))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.radius24 + 10, style: .continuous)
+                            .stroke(ODColor.glassBorder.opacity(0.94), lineWidth: 0.95)
+                    )
+                    .shadow(color: Color.black.opacity(0.10), radius: 22, x: 0, y: 12)
+                    .frame(height: 78)
+
+                HStack(spacing: 0) {
+                    tabItem(for: .home)
+                    tabItem(for: .templates)
+
+                    Spacer(minLength: 84)
+
+                    tabItem(for: .tasks)
+                    tabItem(for: .settings)
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 11)
+
                 ElevatedTaskTabButton(
                     title: "Task",
                     accessibilityLabel: "Create task"
                 ) {
                     showTaskComposer = true
                 }
-                Spacer(minLength: 0)
+                .offset(y: -31)
             }
-            .padding(.horizontal, OneDoneStyle.space16)
+            .padding(.horizontal, OneDoneStyle.space20)
+            .padding(.top, 10)
             .padding(.bottom, 6)
         }
         .sheet(isPresented: $showTaskComposer) {
             NavigationStack {
                 NewTaskView(appState: appState, prefilledPrompt: nil)
             }
+        }
+        .onAppear {
+            // iOS 17+ can still render the native TabView bar in some layouts even when hidden via toolbar APIs.
+            // Keep the system bar hidden while this custom glass tab shell is active.
+            UITabBar.appearance().isHidden = true
+        }
+        .onDisappear {
+            UITabBar.appearance().isHidden = false
+        }
+    }
+
+    private func tabItem(for tab: AppTab) -> some View {
+        Button {
+            appState.selectedTab = tab
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: tab.systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                Text(tabLabel(for: tab))
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+            }
+            .foregroundStyle(appState.selectedTab == tab ? ODColor.accentPrimaryDeepGreen : ODColor.textTertiary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.rawValue)
+    }
+
+    private func tabLabel(for tab: AppTab) -> String {
+        switch tab {
+        case .home:
+            return "Home"
+        case .templates:
+            return "Templates"
+        case .tasks:
+            return "Tasks"
+        case .settings:
+            return "Settings"
         }
     }
 }

@@ -2,10 +2,10 @@ import SwiftUI
 
 enum ODColor {
     // MARK: - Base Canvas (warm / calm)
-    static let backgroundWarm = Color(red: 0.975, green: 0.954, blue: 0.918)
-    static let backgroundAccentRadialA = Color(red: 0.31, green: 0.55, blue: 0.43).opacity(0.26)
-    static let backgroundAccentRadialB = Color(red: 0.89, green: 0.65, blue: 0.39).opacity(0.21)
-    static let backgroundAccentRadialC = Color(red: 0.95, green: 0.90, blue: 0.80).opacity(0.18)
+    static let backgroundWarm = Color(red: 0.969, green: 0.973, blue: 0.945)
+    static let backgroundAccentRadialA = Color(red: 0.09, green: 0.42, blue: 0.36).opacity(0.15)
+    static let backgroundAccentRadialB = Color(red: 0.91, green: 0.58, blue: 0.36).opacity(0.14)
+    static let backgroundAccentRadialC = Color.white.opacity(0.18)
 
     // MARK: - Glass Surfaces
     static let glassFillPrimary = Color.white.opacity(0.50)
@@ -54,9 +54,9 @@ struct ODWarmRadialBackground: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.20),
-                    Color.clear,
-                    Color.white.opacity(0.10)
+                    Color.white.opacity(0.84),
+                    Color.white.opacity(0.54),
+                    Color.white.opacity(0.22)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -66,24 +66,24 @@ struct ODWarmRadialBackground: View {
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialA, .clear],
                 center: .topLeading,
-                startRadius: 10,
-                endRadius: 520
+                startRadius: 8,
+                endRadius: 330
             )
             .blendMode(.normal)
 
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialB, .clear],
-                center: .bottomTrailing,
-                startRadius: 16,
-                endRadius: 460
+                center: .topTrailing,
+                startRadius: 10,
+                endRadius: 340
             )
             .blendMode(.normal)
 
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialC, .clear],
-                center: .topTrailing,
-                startRadius: 12,
-                endRadius: 340
+                center: .bottom,
+                startRadius: 24,
+                endRadius: 440
             )
             .blendMode(.normal)
         }
