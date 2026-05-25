@@ -116,8 +116,13 @@ struct RemoteReminderService: ReminderServiceProtocol {
 
     private func get(endpoint: String, queryItems: [URLQueryItem]) async throws -> Data {
         guard let url = edgeFunctionURL(endpoint: endpoint, queryItems: queryItems) else {
+#if DEBUG
+            print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=dispatch_skipped reason=missing_base_url")
+#endif
             throw ReminderSyncServiceError.missingBaseURL
         }
+
+        logReadDispatch(endpoint: endpoint, url: url, queryItems: queryItems)
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -132,6 +137,11 @@ struct RemoteReminderService: ReminderServiceProtocol {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw ReminderSyncServiceError.invalidResponse
             }
+            logReadResponseReceived(
+                endpoint: endpoint,
+                statusCode: httpResponse.statusCode,
+                data: data
+            )
 
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 402 || httpResponse.statusCode == 403 {
                 logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
@@ -470,7 +480,7 @@ struct RemoteReminderService: ReminderServiceProtocol {
 #if DEBUG
         let keys = topLevelJSONKeys(from: data)
         let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        print("[OneDone][RemoteRead] endpoint=\(endpoint) status=\(statusCode) keys=\(keysDescription)")
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=http_failure status=\(statusCode) keys=\(keysDescription)")
 #endif
     }
 
@@ -478,7 +488,24 @@ struct RemoteReminderService: ReminderServiceProtocol {
 #if DEBUG
         let keys = topLevelJSONKeys(from: data)
         let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        print("[OneDone][RemoteReadDecode] endpoint=\(endpoint) keys=\(keysDescription)")
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=decode_failure keys=\(keysDescription)")
+#endif
+    }
+
+    private func logReadDispatch(endpoint: String, url: URL, queryItems: [URLQueryItem]) {
+#if DEBUG
+        let host = url.host ?? "unknown"
+        let path = url.path
+        let taskID = queryItems.first(where: { $0.name == "task_id" })?.value ?? "none"
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=dispatching host=\(host) path=\(path) task_id=\(taskID)")
+#endif
+    }
+
+    private func logReadResponseReceived(endpoint: String, statusCode: Int, data: Data) {
+#if DEBUG
+        let keys = topLevelJSONKeys(from: data)
+        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=response_received status=\(statusCode) keys=\(keysDescription)")
 #endif
     }
 
