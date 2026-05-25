@@ -294,6 +294,8 @@ struct TaskDetailView: View {
                             showCustomDatePicker = true
                         }
                     }
+                    .frame(maxWidth: 340)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     VStack(spacing: OneDoneStyle.contentSpacing) {
                         ODSecondaryButton(
@@ -325,6 +327,8 @@ struct TaskDetailView: View {
                             }
                         }
                     }
+                    .frame(maxWidth: 340)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
 
                 if let reminderFeedback {
@@ -424,29 +428,33 @@ struct TaskDetailView: View {
                 .datePickerStyle(.graphical)
                 .tint(ODColor.primary)
 
-                ODPrimaryButton(
-                    title: "Schedule reminder",
-                    icon: "checkmark.circle.fill",
-                    isDisabled: isReminderActionInProgress
-                ) {
-                    guard let task else { return }
-                    runReminderAction {
-                        await appState.scheduleTaskReminder(
-                            task.id,
-                            on: customReminderDate,
-                            context: "Reminder scheduled for custom date."
-                        )
+                VStack(spacing: OneDoneStyle.contentSpacing) {
+                    ODPrimaryButton(
+                        title: "Schedule reminder",
+                        icon: "checkmark.circle.fill",
+                        isDisabled: isReminderActionInProgress
+                    ) {
+                        guard let task else { return }
+                        runReminderAction {
+                            await appState.scheduleTaskReminder(
+                                task.id,
+                                on: customReminderDate,
+                                context: "Reminder scheduled for custom date."
+                            )
+                        }
+                        showCustomDatePicker = false
                     }
-                    showCustomDatePicker = false
-                }
 
-                ODSecondaryButton(
-                    title: "Cancel",
-                    icon: "xmark",
-                    isDisabled: isReminderActionInProgress
-                ) {
-                    showCustomDatePicker = false
+                    ODSecondaryButton(
+                        title: "Cancel",
+                        icon: "xmark",
+                        isDisabled: isReminderActionInProgress
+                    ) {
+                        showCustomDatePicker = false
+                    }
                 }
+                .frame(maxWidth: 340)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(OneDoneStyle.screenPadding)
             .oneDoneScreen()
