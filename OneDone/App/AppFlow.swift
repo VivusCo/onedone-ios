@@ -1,5 +1,6 @@
 import SwiftUI
 import Observation
+import UIKit
 
 struct AppFlow: View {
     @Bindable var appState: AppState
@@ -143,6 +144,14 @@ private struct MainTabShell: View {
             NavigationStack {
                 NewTaskView(appState: appState, prefilledPrompt: nil)
             }
+        }
+        .onAppear {
+            // iOS 17+ can still render the native TabView bar in some layouts even when hidden via toolbar APIs.
+            // Keep the system bar hidden while this custom glass tab shell is active.
+            UITabBar.appearance().isHidden = true
+        }
+        .onDisappear {
+            UITabBar.appearance().isHidden = false
         }
     }
 
