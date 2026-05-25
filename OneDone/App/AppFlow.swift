@@ -63,6 +63,7 @@ struct AppFlow: View {
 
 private struct MainTabShell: View {
     @Bindable var appState: AppState
+    @State private var showTaskComposer: Bool = false
 
     var body: some View {
         TabView(selection: $appState.selectedTab) {
@@ -99,7 +100,23 @@ private struct MainTabShell: View {
             .tag(AppTab.settings)
         }
         .tint(ODColor.primary)
-        .background(ODColor.background)
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
+        .toolbarColorScheme(.light, for: .tabBar)
+        .overlay(alignment: .bottom) {
+            ElevatedTaskTabButton(
+                title: "Task",
+                accessibilityLabel: "Create task"
+            ) {
+                showTaskComposer = true
+            }
+            .padding(.bottom, 8)
+        }
+        .sheet(isPresented: $showTaskComposer) {
+            NavigationStack {
+                NewTaskView(appState: appState, prefilledPrompt: nil)
+            }
+        }
     }
 }
 
