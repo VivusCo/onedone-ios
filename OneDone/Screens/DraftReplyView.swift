@@ -26,16 +26,8 @@ struct DraftReplyView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: "Draft Reply",
-                    subtitle: "Review, copy, and track follow-up"
-                )
-
                 if let task {
-                    subjectSection(task: task)
-                    messageBodySection
-                    toneSection
-                    languageSection
+                    replyComposerSection(task: task)
                     actionsSection
 
                     if showPostCopyPrompt {
@@ -95,10 +87,25 @@ struct DraftReplyView: View {
         }
     }
 
-    private func subjectSection(task: MockTask) -> some View {
+    private func replyComposerSection(task: MockTask) -> some View {
         ODCard(style: .strong) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                cardTitle("Subject")
+                HStack(alignment: .center, spacing: OneDoneStyle.tightSpacing) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.space4) {
+                        Text("Draft Reply")
+                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .foregroundStyle(ODColor.textPrimary)
+                            .lineLimit(1)
+
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            ODStatusBadge(title: selectedTone.rawValue, tone: .highlight)
+                            ODStatusBadge(title: selectedLanguage.rawValue, tone: .neutral)
+                        }
+                    }
+                    Spacer()
+                    compactCopyButton
+                }
+
                 TextField("Subject", text: $subject)
                     .font(OneDoneStyle.bodyFont)
                     .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
@@ -112,27 +119,9 @@ struct DraftReplyView: View {
                             .stroke(ODColor.border, lineWidth: 1)
                     )
 
-                Text(task.title)
-                    .font(OneDoneStyle.captionFont)
-                    .foregroundStyle(ODColor.textTertiary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-            }
-        }
-    }
-
-    private var messageBodySection: some View {
-        ODCard(style: .default) {
-            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                HStack(alignment: .center, spacing: OneDoneStyle.tightSpacing) {
-                    cardTitle("Message body")
-                    Spacer()
-                    compactCopyButton
-                }
-
                 TextEditor(text: $messageBody)
                     .font(OneDoneStyle.bodyFont)
-                    .frame(minHeight: 180)
+                    .frame(minHeight: 210)
                     .padding(8)
                     .background(
                         RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
@@ -143,67 +132,52 @@ struct DraftReplyView: View {
                             .stroke(ODColor.border, lineWidth: 1)
                     )
 
+                HStack(spacing: OneDoneStyle.tightSpacing) {
+                    ForEach(ReplyTone.allCases) { tone in
+                        metadataToggle(
+                            title: tone.rawValue,
+                            isSelected: selectedTone == tone
+                        ) {
+                            selectedTone = tone
+                        }
+                    }
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ForEach(ReplyLanguage.allCases) { language in
+                            metadataToggle(
+                                title: language.rawValue,
+                                isSelected: selectedLanguage == language
+                            ) {
+                                selectedLanguage = language
+                            }
+                        }
+                    }
+                }
+
                 if didCopy {
                     Label("Copied", systemImage: "checkmark.circle.fill")
                         .font(OneDoneStyle.captionFont.weight(.semibold))
                         .foregroundStyle(ODColor.accentPrimaryDeepGreen)
                         .accessibilityLabel("Copied to clipboard")
                 }
-            }
-        }
-    }
 
-    private var toneSection: some View {
-        ODCard(style: .muted) {
-            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                cardTitle("Tone")
-                Picker("Tone", selection: $selectedTone) {
-                    ForEach(ReplyTone.allCases) { tone in
-                        Text(tone.rawValue).tag(tone)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-        }
-    }
-
-    private var languageSection: some View {
-        ODCard(style: .muted) {
-            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                cardTitle("Language")
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: OneDoneStyle.tightSpacing) {
-                        ForEach(ReplyLanguage.allCases) { language in
-                            Button {
-                                selectedLanguage = language
-                            } label: {
-                                Text(language.rawValue)
-                                    .font(OneDoneStyle.captionFont.weight(.semibold))
-                                    .foregroundStyle(
-                                        selectedLanguage == language ? ODColor.primaryContrast : ODColor.textPrimary
-                                    )
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule(style: .continuous)
-                                            .fill(selectedLanguage == language ? ODColor.primary : ODColor.surfaceStrong)
-                                    )
-                                    .overlay(
-                                        Capsule(style: .continuous)
-                                            .stroke(ODColor.glassBorder, lineWidth: selectedLanguage == language ? 0 : 1)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+                Text(task.title)
+                    .font(OneDoneStyle.captionFont)
+                    .foregroundStyle(ODColor.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
     }
 
     private var actionsSection: some View {
-        VStack(spacing: OneDoneStyle.contentSpacing) {
+        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+            Text("Need different wording?")
+                .font(OneDoneStyle.captionFont)
+                .foregroundStyle(ODColor.textSecondary)
+
             ODSecondaryButton(
                 title: isRegeneratingReply ? "Regenerating..." : "Regenerate",
                 icon: "arrow.clockwise",
@@ -218,7 +192,8 @@ struct DraftReplyView: View {
                     await regenerateDraft()
                 }
             }
-            .frame(maxWidth: 340)
+            .frame(maxWidth: 240)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if isRegeneratingReply {
                 HStack(spacing: OneDoneStyle.tightSpacing) {
@@ -230,16 +205,21 @@ struct DraftReplyView: View {
                 }
             }
         }
+        .padding(.horizontal, OneDoneStyle.space4)
     }
 
     private var postCopyPromptSection: some View {
-        ODCard(style: .strong) {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 Text("Did you send it?")
                     .font(OneDoneStyle.cardTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
 
-                VStack(spacing: OneDoneStyle.contentSpacing) {
+                Text("Mark it sent so OneDone can help you follow up.")
+                    .font(OneDoneStyle.captionFont)
+                    .foregroundStyle(ODColor.textSecondary)
+
+                HStack(spacing: OneDoneStyle.contentSpacing) {
                     ODPrimaryButton(
                         title: "Yes, I sent it",
                         icon: "checkmark.circle.fill",
@@ -249,39 +229,45 @@ struct DraftReplyView: View {
                             await markAsSent()
                         }
                     }
+                    .frame(maxWidth: .infinity)
 
                     ODSecondaryButton(title: "Not yet", icon: "clock", isDisabled: isSyncActionInProgress) {
                         showPostCopyPrompt = false
                     }
+                    .frame(maxWidth: .infinity)
+                }
 
+                HStack {
+                    Spacer(minLength: 0)
                     ODSecondaryButton(title: "Remind me later", icon: "bell", isDisabled: isSyncActionInProgress) {
                         Task {
                             await remindMeLater()
                         }
                     }
+                    .frame(maxWidth: 240)
+                    Spacer(minLength: 0)
                 }
-                .frame(maxWidth: 340)
-                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }
 
     private var followUpReminderSection: some View {
-        ODCard(style: .muted) {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 Text("Set follow-up reminder")
                     .font(OneDoneStyle.cardTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
 
-                Text("Choose when OneDone should remind you to check for a reply.")
+                Text("Don’t hold it all in your head. Set a calm follow-up reminder now.")
                     .font(OneDoneStyle.subheadlineFont)
                     .foregroundStyle(ODColor.textSecondary)
 
-                HStack(spacing: OneDoneStyle.tightSpacing) {
+                VStack(spacing: OneDoneStyle.contentSpacing) {
                     reminderButton(title: "Tomorrow", hours: 24)
                     reminderButton(title: "In 2 days", hours: 48)
                     reminderButton(title: "In 3 days", hours: 72)
                 }
+                .frame(maxWidth: 260)
                 .frame(maxWidth: .infinity, alignment: .center)
             }
         }
@@ -336,6 +322,7 @@ struct DraftReplyView: View {
                 )
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
     }
 
     private func copyDraft() {
@@ -500,6 +487,25 @@ struct DraftReplyView: View {
         Text(text)
             .font(OneDoneStyle.captionFont.weight(.semibold))
             .foregroundStyle(ODColor.primary)
+    }
+
+    private func metadataToggle(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(OneDoneStyle.captionFont.weight(.semibold))
+                .foregroundStyle(isSelected ? ODColor.primaryContrast : ODColor.textPrimary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(isSelected ? ODColor.primary : ODColor.glassFillSecondary)
+                )
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(ODColor.glassBorder, lineWidth: isSelected ? 0 : 1)
+                )
+        }
+        .buttonStyle(.plain)
     }
 }
 

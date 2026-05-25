@@ -228,22 +228,32 @@ struct TaskDetailView: View {
     }
 
     private func reminderSection(_ task: MockTask) -> some View {
-        ODCard(style: .muted) {
-            VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+        ODCard(style: .default) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Reminder")
 
+                Text("Set a gentle follow-up. OneDone schedules locally first, then syncs.")
+                    .font(OneDoneStyle.captionFont)
+                    .foregroundStyle(ODColor.textSecondary)
+
                 if let reminderDate = task.reminderDate {
-                    Label("Reminder set for \(dateTimeFormatter.string(from: reminderDate))", systemImage: "bell")
-                        .font(OneDoneStyle.subheadlineFont)
-                        .foregroundStyle(ODColor.textSecondary)
+                    reminderField(
+                        label: "Date and time",
+                        value: dateTimeFormatter.string(from: reminderDate),
+                        icon: "bell"
+                    )
                 } else if let dueDate = task.dueDate {
-                    Label("Due on \(dateTimeFormatter.string(from: dueDate))", systemImage: "calendar")
-                        .font(OneDoneStyle.subheadlineFont)
-                        .foregroundStyle(ODColor.textSecondary)
+                    reminderField(
+                        label: "Due date",
+                        value: dateTimeFormatter.string(from: dueDate),
+                        icon: "calendar"
+                    )
                 } else {
-                    Text("No reminder set yet.")
-                        .font(OneDoneStyle.subheadlineFont)
-                        .foregroundStyle(ODColor.textSecondary)
+                    reminderField(
+                        label: "Date and time",
+                        value: "Not set yet",
+                        icon: "bell"
+                    )
                 }
 
                 if task.reminderDate == nil {
@@ -281,7 +291,7 @@ struct TaskDetailView: View {
                             showCustomDatePicker = true
                         }
                     }
-                    .frame(maxWidth: 340)
+                    .frame(maxWidth: 260)
                     .frame(maxWidth: .infinity, alignment: .center)
                 } else {
                     VStack(spacing: OneDoneStyle.contentSpacing) {
@@ -314,7 +324,7 @@ struct TaskDetailView: View {
                             }
                         }
                     }
-                    .frame(maxWidth: 340)
+                    .frame(maxWidth: 260)
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
 
@@ -405,22 +415,63 @@ struct TaskDetailView: View {
             .textCase(.uppercase)
     }
 
+    private func reminderField(label: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: OneDoneStyle.space8) {
+            Text(label)
+                .font(OneDoneStyle.captionFont.weight(.semibold))
+                .foregroundStyle(ODColor.textSecondary)
+                .textCase(.uppercase)
+
+            HStack(spacing: OneDoneStyle.tightSpacing) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+
+                Text(value)
+                    .font(OneDoneStyle.subheadlineFont)
+                    .foregroundStyle(ODColor.textPrimary)
+                    .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+            .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+            .background(
+                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                    .fill(ODColor.glassFillSecondary)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                    .stroke(ODColor.glassBorder, lineWidth: 0.9)
+            )
+        }
+    }
+
     private var customDateSheet: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: "Choose reminder date",
-                    subtitle: "Pick when OneDone should remind you"
-                )
+                ODCard(style: .strong) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                        Text("Choose reminder date")
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(ODColor.textPrimary)
 
-                DatePicker(
-                    "Reminder date",
-                    selection: $customReminderDate,
-                    in: Date()...,
-                    displayedComponents: [.date, .hourAndMinute]
-                )
-                .datePickerStyle(.graphical)
-                .tint(ODColor.primary)
+                        Text("Pick when OneDone should remind you.")
+                            .font(OneDoneStyle.subheadlineFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                }
+
+                ODCard(style: .default) {
+                    DatePicker(
+                        "Reminder date",
+                        selection: $customReminderDate,
+                        in: Date()...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.graphical)
+                    .tint(ODColor.primary)
+                }
 
                 VStack(spacing: OneDoneStyle.contentSpacing) {
                     ODPrimaryButton(
@@ -447,7 +498,7 @@ struct TaskDetailView: View {
                         showCustomDatePicker = false
                     }
                 }
-                .frame(maxWidth: 340)
+                .frame(maxWidth: 260)
                 .frame(maxWidth: .infinity, alignment: .center)
             }
             .padding(OneDoneStyle.screenPadding)
