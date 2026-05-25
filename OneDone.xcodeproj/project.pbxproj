@@ -6,7 +6,12 @@
 	objectVersion = 70;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		42F4C5CD2FC1AA4700DDB45C /* OneDone.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 42F4C5CC2FC1AA4700DDB45C /* OneDone.storekit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		42F4C5CC2FC1AA4700DDB45C /* OneDone.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = OneDone.storekit; sourceTree = "<group>"; };
 		A10000000000000000000001 /* OneDone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OneDone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -28,6 +33,7 @@
 		A10000000000000000000004 = {
 			isa = PBXGroup;
 			children = (
+				42F4C5CC2FC1AA4700DDB45C /* OneDone.storekit */,
 				A10000000000000000000002 /* OneDone */,
 				A10000000000000000000005 /* Products */,
 			);
@@ -102,6 +108,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				42F4C5CD2FC1AA4700DDB45C /* OneDone.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
