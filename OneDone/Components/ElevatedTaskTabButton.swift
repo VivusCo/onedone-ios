@@ -8,18 +8,19 @@ struct ElevatedTaskTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 7) {
+            VStack(spacing: 8) {
                 ZStack {
                     Circle()
-                        .fill(.ultraThinMaterial)
-                        .frame(width: 76, height: 76)
+                        .fill(ODColor.backgroundWarm.opacity(0.98))
+                        .frame(width: 74, height: 74)
                         .overlay(
                             Circle()
-                                .fill(ODColor.glassFillPrimary.opacity(0.92))
+                                .fill(.ultraThinMaterial)
+                                .opacity(0.74)
                         )
                         .overlay(
                             Circle()
-                                .stroke(ODColor.glassBorder.opacity(0.96), lineWidth: 1.05)
+                                .stroke(ODColor.glassBorder.opacity(0.96), lineWidth: 1.0)
                         )
 
                     Circle()
@@ -33,46 +34,33 @@ struct ElevatedTaskTabButton: View {
                                 endPoint: .bottom
                             )
                         )
-                        .frame(width: 60, height: 60)
+                        .frame(width: 62, height: 62)
                         .overlay(
                             Circle()
-                                .stroke(Color.white.opacity(0.34), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.30), lineWidth: 1.0)
                         )
                         .overlay(alignment: .top) {
                             Circle()
-                                .fill(Color.white.opacity(0.24))
-                                .frame(width: 28, height: 10)
-                                .blur(radius: 5)
-                                .offset(y: 8)
+                                .fill(Color.white.opacity(0.18))
+                                .frame(width: 30, height: 11)
+                                .blur(radius: 5.5)
+                                .offset(y: 8.5)
                         }
-                        .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 9)
-                        .shadow(color: ODColor.accentPrimaryDeepGreen.opacity(0.22), radius: 6, x: 0, y: 4)
+                        .shadow(color: Color.black.opacity(0.13), radius: 13, x: 0, y: 9)
+                        .shadow(color: ODColor.accentPrimaryDeepGreen.opacity(0.20), radius: 5, x: 0, y: 4)
 
                     Image(systemName: "plus")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 21, weight: .bold))
                         .foregroundStyle(ODColor.accentPrimaryContrast)
                 }
 
                 Text(title)
-                    .font(OneDoneStyle.captionFont.weight(.semibold))
-                    .foregroundStyle(ODColor.textPrimary)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(ODColor.accentPrimaryDeepGreen)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 10)
-            .padding(.top, 4)
-            .padding(.bottom, 2)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(ODColor.glassFillSecondary.opacity(0.88))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(ODColor.glassBorder.opacity(0.86), lineWidth: 0.8)
-                    )
-            )
+            .padding(.horizontal, 8)
+            .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
