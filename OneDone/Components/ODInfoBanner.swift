@@ -8,10 +8,16 @@ struct ODInfoBanner: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: OneDoneStyle.contentSpacing) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(tone.textColor)
-                .padding(.top, 1)
+            ZStack {
+                Circle()
+                    .fill(iconBackground)
+                    .frame(width: 24, height: 24)
+
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(iconForeground)
+            }
+            .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -23,20 +29,50 @@ struct ODInfoBanner: View {
                     .foregroundStyle(ODColor.textSecondary)
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                        .fill(tone.backgroundColor.opacity(0.82))
+                    RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
+                        .fill(tone.backgroundColor.opacity(0.72))
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
                 .stroke(ODColor.glassBorder, lineWidth: 0.9)
         )
+        .shadow(color: ODColor.glassShadow.opacity(0.18), radius: 8, x: 0, y: 4)
+    }
+
+    private var iconBackground: Color {
+        switch tone {
+        case .warning:
+            return ODColor.statusWarningFill
+        case .success:
+            return ODColor.statusSuccessFill
+        case .locked:
+            return ODColor.statusLockedFill
+        case .neutral:
+            return ODColor.statusNeutralFill
+        case .highlight:
+            return ODColor.primarySoft
+        }
+    }
+
+    private var iconForeground: Color {
+        switch tone {
+        case .warning:
+            return ODColor.accentWarmOrangeSoft
+        case .success:
+            return ODColor.accentPrimaryDeepGreen
+        case .locked, .neutral:
+            return ODColor.textSecondary
+        case .highlight:
+            return ODColor.accentPrimaryDeepGreen
+        }
     }
 }
 

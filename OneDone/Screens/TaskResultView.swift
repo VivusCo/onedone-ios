@@ -44,9 +44,27 @@ struct TaskResultView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(title: "Task Result", subtitle: "Clear next step and checklist")
+                IllustrationCard(
+                    title: "Useful path found",
+                    subtitle: "Start with one clear action, then check items as you go.",
+                    variant: .focused,
+                    minHeight: 128
+                )
 
                 ODCard(style: .strong) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                        Text("Next step")
+                            .font(OneDoneStyle.captionFont.weight(.semibold))
+                            .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+
+                        Text(nextStepText)
+                            .font(.system(size: 25, weight: .black, design: .rounded))
+                            .foregroundStyle(ODColor.textPrimary)
+                            .lineLimit(4)
+                    }
+                }
+
+                ODCard(style: .default) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                         Text(task.title)
                             .font(OneDoneStyle.cardTitleFont)
@@ -55,19 +73,7 @@ struct TaskResultView: View {
                         Text(summaryText)
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
-                            .lineLimit(4)
-                    }
-                }
-
-                ODCard(style: .default) {
-                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                        Text("Next step")
-                            .font(OneDoneStyle.captionFont.weight(.semibold))
-                            .foregroundStyle(ODColor.accentPrimaryDeepGreen)
-
-                        Text(nextStepText)
-                            .font(OneDoneStyle.cardTitleFont)
-                            .foregroundStyle(ODColor.textPrimary)
+                            .lineLimit(5)
                     }
                 }
 
@@ -80,11 +86,10 @@ struct TaskResultView: View {
 
                             Spacer()
 
-                            if !checklistSteps.isEmpty {
-                                Text(checklistProgressText)
-                                    .font(OneDoneStyle.captionFont)
-                                    .foregroundStyle(ODColor.textSecondary)
-                            }
+                            ODStatusBadge(
+                                title: checklistSteps.isEmpty ? "No items yet" : "Tap to check",
+                                tone: .success
+                            )
                         }
 
                         if checklistSteps.isEmpty {
@@ -104,26 +109,16 @@ struct TaskResultView: View {
                                     .accessibilityLabel("Checklist item \(index + 1): \(step)")
                                 }
                             }
+
+                            Text(checklistProgressText)
+                                .font(OneDoneStyle.captionFont)
+                                .foregroundStyle(ODColor.textSecondary)
                         }
                     }
                 }
 
-                HStack {
-                    Spacer(minLength: 0)
-                    ODPrimaryButton(
-                        title: didSave ? "Saved to My Tasks" : "Save to My Tasks",
-                        icon: didSave ? "checkmark" : "square.and.arrow.down",
-                        isDisabled: didSave
-                    ) {
-                        appState.saveTask(task)
-                        didSave = true
-                    }
-                    .frame(maxWidth: 360)
-                    Spacer(minLength: 0)
-                }
-
                 HStack(spacing: OneDoneStyle.contentSpacing) {
-                    ODSecondaryButton(title: "Draft Reply", icon: "text.bubble", fullWidth: true) {
+                    ODPrimaryButton(title: "Draft Reply", icon: "text.bubble", fullWidth: true) {
                         ensureTaskSaved()
                         showDraftReply = true
                     }
@@ -134,14 +129,33 @@ struct TaskResultView: View {
                     }
                 }
 
-                ODSecondaryButton(title: "View Task Detail", icon: "doc.text") {
-                    ensureTaskSaved()
-                    showTaskDetail = true
-                }
+                VStack(spacing: OneDoneStyle.tightSpacing) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        if didSave {
+                            Text("Saved to My Tasks")
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
+                                .foregroundStyle(ODColor.textSecondary)
+                        } else {
+                            ODSecondaryButton(title: "Save to My Tasks", icon: "square.and.arrow.down", fullWidth: false) {
+                                appState.saveTask(task)
+                                didSave = true
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
 
-                ODSecondaryButton(title: "Open My Tasks tab", icon: "list.bullet") {
-                    appState.selectedTab = .tasks
-                    dismiss()
+                    HStack(spacing: OneDoneStyle.contentSpacing) {
+                        ODSecondaryButton(title: "View Task Detail", icon: "doc.text", fullWidth: true) {
+                            ensureTaskSaved()
+                            showTaskDetail = true
+                        }
+
+                        ODSecondaryButton(title: "Open My Tasks", icon: "list.bullet", fullWidth: true) {
+                            appState.selectedTab = .tasks
+                            dismiss()
+                        }
+                    }
                 }
             }
             .padding(OneDoneStyle.screenPadding)

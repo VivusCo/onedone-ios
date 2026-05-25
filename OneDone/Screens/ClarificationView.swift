@@ -26,53 +26,69 @@ struct ClarificationView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: "Clarification",
-                    subtitle: "One quick detail before we continue"
-                )
-
-                ODCard {
+                ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        ODStatusBadge(title: "Needs clarification", tone: .warning)
+
                         Text(activeDraft.clarificationQuestion)
-                            .font(OneDoneStyle.cardTitleFont)
+                            .font(.system(size: 24, weight: .black, design: .rounded))
                             .foregroundStyle(ODColor.textPrimary)
 
-                        if hasOptions {
-                            VStack(spacing: OneDoneStyle.tightSpacing) {
-                                ForEach(activeDraft.clarificationOptions, id: \.self) { option in
-                                    clarificationOptionRow(option)
+                        Text(clarificationContextText)
+                            .font(OneDoneStyle.subheadlineFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                            .lineLimit(3)
+                    }
+                }
+
+                if hasOptions {
+                    VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ForEach(activeDraft.clarificationOptions, id: \.self) { option in
+                            clarificationOptionRow(option)
+                        }
+                    }
+                } else {
+                    ODCard {
+                        ODTextField(
+                            label: "Your answer",
+                            placeholder: "Type your answer",
+                            text: $manualAnswer
+                        )
+                    }
+                }
+
+                VStack(spacing: OneDoneStyle.contentSpacing) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        ODPrimaryButton(
+                            title: "Continue",
+                            icon: "arrow.right",
+                            isDisabled: selectedClarificationAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
+                        ) {
+                            Task {
+                                await submitClarification()
+                            }
+                        }
+                        .frame(maxWidth: 280)
+                        Spacer(minLength: 0)
+                    }
+
+                    HStack {
+                        Spacer(minLength: 0)
+                        ODSecondaryButton(title: "Skip for now", icon: "pause") {
+                            let pendingTask = appState.makeNeedsClarificationTask(from: activeDraft)
+                            appState.saveTask(pendingTask)
+                            appState.selectedTab = .tasks
+                            if appState.shouldUseRemoteTaskActions {
+                                Task {
+                                    _ = await appState.refreshTasksFromRemote()
                                 }
                             }
-                        } else {
-                            ODTextField(
-                                label: "Your answer",
-                                placeholder: "Type your answer",
-                                text: $manualAnswer
-                            )
+                            dismiss()
                         }
+                        .frame(maxWidth: 280)
+                        Spacer(minLength: 0)
                     }
-                }
-
-                ODPrimaryButton(
-                    title: "Continue",
-                    icon: "arrow.right",
-                    isDisabled: selectedClarificationAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
-                ) {
-                    Task {
-                        await submitClarification()
-                    }
-                }
-
-                ODSecondaryButton(title: "Skip for now", icon: "pause") {
-                    let pendingTask = appState.makeNeedsClarificationTask(from: activeDraft)
-                    appState.saveTask(pendingTask)
-                    appState.selectedTab = .tasks
-                    if appState.shouldUseRemoteTaskActions {
-                        Task {
-                            _ = await appState.refreshTasksFromRemote()
-                        }
-                    }
-                    dismiss()
                 }
 
                 if isSubmitting {
@@ -125,6 +141,12 @@ struct ClarificationView: View {
 
     private var hasOptions: Bool {
         !activeDraft.clarificationOptions.isEmpty
+    }
+
+    private var clarificationContextText: String {
+        hasOptions
+            ? "This missing detail changes the next steps."
+            : "Share one short detail so we can continue with the right path."
     }
 
     private var selectedClarificationAnswer: String {
@@ -212,18 +234,27 @@ struct ClarificationView: View {
 
                 if selectedOption == option {
                     Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(ODColor.primary)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(ODColor.textTertiary)
                 }
             }
             .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
-            .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+            .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                    .fill(selectedOption == option ? ODColor.primarySoft : ODColor.surface)
+                RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                            .fill(selectedOption == option ? ODColor.primarySoft.opacity(0.9) : ODColor.glassFillSecondary)
+                    )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                    .stroke(ODColor.border, lineWidth: 1)
+                RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                    .stroke(ODColor.glassBorder, lineWidth: 0.9)
             )
         }
         .buttonStyle(.plain)

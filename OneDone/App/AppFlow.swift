@@ -103,30 +103,31 @@ private struct MainTabShell: View {
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ZStack(alignment: .top) {
-                RoundedRectangle(cornerRadius: OneDoneStyle.radius24 + 10, style: .continuous)
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .fill(.ultraThinMaterial)
                     .overlay(
-                        RoundedRectangle(cornerRadius: OneDoneStyle.radius24 + 10, style: .continuous)
-                            .fill(ODColor.glassFillPrimary.opacity(0.78))
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .fill(ODColor.glassFillPrimary.opacity(0.70))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: OneDoneStyle.radius24 + 10, style: .continuous)
-                            .stroke(ODColor.glassBorder.opacity(0.94), lineWidth: 0.95)
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .stroke(ODColor.glassBorder.opacity(0.90), lineWidth: 0.9)
                     )
-                    .shadow(color: Color.black.opacity(0.10), radius: 22, x: 0, y: 12)
-                    .frame(height: 78)
+                    .shadow(color: Color.black.opacity(0.12), radius: 18, x: 0, y: 10)
+                    .frame(height: 72)
 
                 HStack(spacing: 0) {
                     tabItem(for: .home)
-                    tabItem(for: .templates)
-
-                    Spacer(minLength: 84)
-
                     tabItem(for: .tasks)
+
+                    Spacer(minLength: 0)
+                        .frame(maxWidth: .infinity)
+
+                    tabItem(for: .templates)
                     tabItem(for: .settings)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 11)
+                .padding(.horizontal, 8)
+                .padding(.top, 9)
 
                 ElevatedTaskTabButton(
                     title: "Task",
@@ -134,11 +135,11 @@ private struct MainTabShell: View {
                 ) {
                     showTaskComposer = true
                 }
-                .offset(y: -31)
+                .offset(y: -28)
             }
             .padding(.horizontal, OneDoneStyle.space20)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
         }
         .sheet(isPresented: $showTaskComposer) {
             NavigationStack {
@@ -161,15 +162,15 @@ private struct MainTabShell: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: tab.systemImage)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                 Text(tabLabel(for: tab))
-                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.9)
             }
             .foregroundStyle(appState.selectedTab == tab ? ODColor.accentPrimaryDeepGreen : ODColor.textTertiary)
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 6)
+            .padding(.vertical, 5)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

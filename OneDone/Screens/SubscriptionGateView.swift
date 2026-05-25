@@ -14,25 +14,46 @@ struct SubscriptionGateView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: headline,
-                    subtitle: "Access required"
-                )
-
-                ODCard {
+                ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        ODStatusBadge(
+                            title: gateStatusTitle,
+                            tone: gateStatusTone
+                        )
+
+                        Text(headline)
+                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .foregroundStyle(ODColor.textPrimary)
+                            .lineLimit(3)
+
                         Text(subtext)
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
+                    }
+                }
 
-                        if isLockedState {
-                            Divider()
-                                .overlay(ODColor.border.opacity(0.5))
-                                .padding(.vertical, 2)
-
-                            Text("You can still view your existing tasks and task details while creation is locked.")
-                                .font(OneDoneStyle.subheadlineFont)
+                if isLockedState {
+                    ODCard(style: .muted) {
+                        VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                            Text("Still available")
+                                .font(OneDoneStyle.cardTitleFont)
                                 .foregroundStyle(ODColor.textPrimary)
+
+                            availabilityRow("View existing tasks and task details")
+                            availabilityRow("Copy and review saved outputs")
+                            availabilityRow("Restore purchases")
+                        }
+                    }
+                }
+
+                ODCard(style: .default) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        Text("What you keep with active access")
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
+
+                        ForEach(benefitRows, id: \.self) { benefit in
+                            benefitRow(benefit)
                         }
                     }
                 }
@@ -90,6 +111,36 @@ struct SubscriptionGateView: View {
         .oneDoneScreen()
     }
 
+    private var gateStatusTitle: String {
+        switch accessState {
+        case .starter_expired:
+            return "Starter ended"
+        case .trial_not_started, .trial_expired:
+            return "Trial required"
+        case .subscription_expired:
+            return "Subscription ended"
+        case .billing_issue:
+            return "Billing issue"
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            return "Access active"
+        case .onboarding_required:
+            return "Onboarding required"
+        case .unauthenticated:
+            return "Login required"
+        }
+    }
+
+    private var gateStatusTone: ODStatusTone {
+        switch accessState {
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            return .success
+        case .starter_expired, .trial_not_started, .trial_expired, .subscription_expired, .billing_issue:
+            return .warning
+        case .onboarding_required, .unauthenticated:
+            return .neutral
+        }
+    }
+
     private var headline: String {
         switch accessState {
         case .starter_expired, .trial_not_started:
@@ -128,6 +179,36 @@ struct SubscriptionGateView: View {
         }
     }
 
+    private var benefitRows: [String] {
+        switch accessState {
+        case .starter_expired, .trial_not_started, .trial_expired, .subscription_expired, .billing_issue:
+            return [
+                "Create new tasks",
+                "Generate draft replies",
+                "Set follow-up reminders",
+                "Keep your saved task history"
+            ]
+        case .starter_active, .trial_active, .subscription_active, .subscription_cancelled_active, .grace_period:
+            return [
+                "Task creation is available",
+                "Reply generation is available",
+                "Reminder scheduling is available"
+            ]
+        case .onboarding_required:
+            return [
+                "Finish onboarding",
+                "Unlock Starter Access",
+                "Start using full task flows"
+            ]
+        case .unauthenticated:
+            return [
+                "Sign in to continue",
+                "Load your access state",
+                "Resume your saved tasks"
+            ]
+        }
+    }
+
     private var ctaTitle: String {
         switch accessState {
         case .starter_expired, .trial_not_started:
@@ -141,6 +222,34 @@ struct SubscriptionGateView: View {
         case .unauthenticated:
             return "Sign in required"
         }
+    }
+
+    private func benefitRow(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                .padding(.top, 1)
+
+            Text(text)
+                .font(OneDoneStyle.subheadlineFont)
+                .foregroundStyle(ODColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func availabilityRow(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                .padding(.top, 1)
+
+            Text(text)
+                .font(OneDoneStyle.subheadlineFont)
+                .foregroundStyle(ODColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var isLockedState: Bool {
@@ -177,7 +286,7 @@ struct SubscriptionGateView: View {
     }
 
     private var legalLinks: some View {
-        VStack(spacing: OneDoneStyle.tightSpacing) {
+        HStack(spacing: OneDoneStyle.space16) {
             Button {
                 linkFeedback = SubscriptionGateFeedback(
                     kind: .info,
@@ -186,8 +295,8 @@ struct SubscriptionGateView: View {
                 )
             } label: {
                 Text("Terms of Use")
-                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                    .foregroundStyle(ODColor.primary)
+                    .font(OneDoneStyle.captionFont.weight(.semibold))
+                    .foregroundStyle(ODColor.accentPrimaryDeepGreen)
                     .underline()
             }
             .buttonStyle(.plain)
@@ -200,8 +309,8 @@ struct SubscriptionGateView: View {
                 )
             } label: {
                 Text("Privacy Policy")
-                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                    .foregroundStyle(ODColor.primary)
+                    .font(OneDoneStyle.captionFont.weight(.semibold))
+                    .foregroundStyle(ODColor.accentPrimaryDeepGreen)
                     .underline()
             }
             .buttonStyle(.plain)

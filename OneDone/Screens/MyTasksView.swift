@@ -7,6 +7,8 @@ struct MyTasksView: View {
     @State private var isLoadingRemoteTasks: Bool = false
     @State private var remoteLoadErrorMessage: String?
     @State private var hasTriggeredInitialRemoteLoad: Bool = false
+    @State private var showCreateTask: Bool = false
+    @State private var showSubscriptionGate: Bool = false
 
     var body: some View {
         ScrollView {
@@ -16,12 +18,26 @@ struct MyTasksView: View {
                     subtitle: "Follow-through hub for active work"
                 )
 
-                IllustrationCard(
-                    title: "Keep momentum",
-                    subtitle: "Prioritized by what needs your attention first.",
-                    variant: .focused,
-                    minHeight: 118
-                )
+                if filteredAndSortedTasks.isEmpty {
+                    IllustrationCard(
+                        title: "Keep momentum",
+                        subtitle: "Prioritized by what needs your attention first.",
+                        variant: .focused,
+                        minHeight: 118
+                    )
+                } else {
+                    ODCard(contentPadding: 14, style: .muted) {
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            Text("Keep momentum")
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
+                            Spacer(minLength: OneDoneStyle.space8)
+                            Text("\(filteredAndSortedTasks.count) in view")
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
+                                .foregroundStyle(ODColor.textSecondary)
+                        }
+                    }
+                }
 
                 filterBar
 
@@ -67,15 +83,42 @@ struct MyTasksView: View {
                 }
 
                 if filteredAndSortedTasks.isEmpty {
-                    ODCard(style: .muted) {
-                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                            Text("No tasks in this view")
-                                .font(OneDoneStyle.cardTitleFont)
-                                .foregroundStyle(ODColor.textPrimary)
+                    if selectedFilter == .all {
+                        VStack(spacing: OneDoneStyle.sectionSpacing) {
+                            IllustrationCard(
+                                title: "Nothing here yet",
+                                subtitle: "Tap the Task button to turn one messy thing into a clear plan.",
+                                variant: .calm,
+                                minHeight: 118
+                            )
 
-                            Text(emptyStateText)
-                                .font(OneDoneStyle.bodyFont)
-                                .foregroundStyle(ODColor.textSecondary)
+                            ODCard(style: .muted) {
+                                Text(emptyStateText)
+                                    .font(OneDoneStyle.bodyFont)
+                                    .foregroundStyle(ODColor.textSecondary)
+                            }
+
+                            HStack {
+                                Spacer(minLength: 0)
+                                ODPrimaryButton(title: "Create first task", icon: "sparkles") {
+                                    handleEmptyStateCreateTap()
+                                }
+                                .frame(maxWidth: 260)
+                                Spacer(minLength: 0)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        ODCard(style: .muted) {
+                            VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                                Text("No tasks in this view")
+                                    .font(OneDoneStyle.cardTitleFont)
+                                    .foregroundStyle(ODColor.textPrimary)
+
+                                Text(emptyStateText)
+                                    .font(OneDoneStyle.bodyFont)
+                                    .foregroundStyle(ODColor.textSecondary)
+                            }
                         }
                     }
                 } else {
@@ -92,7 +135,7 @@ struct MyTasksView: View {
                                     scheduleText: scheduleText(for: task),
                                     nextStepPreview: task.currentNextStep,
                                     lastEventPreview: task.lastEventPreview,
-                                    style: .default
+                                    style: .muted
                                 )
                             }
                             .buttonStyle(.plain)
@@ -104,6 +147,17 @@ struct MyTasksView: View {
         }
         .navigationTitle("My Tasks")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(isPresented: $showCreateTask) {
+            NewTaskView(appState: appState, prefilledPrompt: nil)
+        }
+        .sheet(isPresented: $showSubscriptionGate) {
+            SubscriptionGateView(
+                appState: appState,
+                accessState: appState.mockAccessState
+            ) {
+                showSubscriptionGate = false
+            }
+        }
         .oneDoneScreen()
         .refreshable {
             await refreshRemoteTasks(showLoading: false)
@@ -114,7 +168,7 @@ struct MyTasksView: View {
     }
 
     private var filterBar: some View {
-        ODCard(contentPadding: 10, style: .muted) {
+        ODCard(contentPadding: 8, style: .muted) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: OneDoneStyle.tightSpacing) {
                     ForEach(MyTasksFilter.allCases) { filter in
@@ -128,10 +182,10 @@ struct MyTasksView: View {
                                     selectedFilter == filter ? ODColor.primaryContrast : ODColor.textPrimary
                                 )
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 7)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(selectedFilter == filter ? ODColor.primary : ODColor.surfaceStrong)
+                                        .fill(selectedFilter == filter ? ODColor.primary : ODColor.glassFillSecondary)
                                 )
                                 .overlay(
                                     Capsule(style: .continuous)
@@ -257,6 +311,14 @@ struct MyTasksView: View {
         let loadError = await appState.refreshTasksFromRemote()
         remoteLoadErrorMessage = loadError
         isLoadingRemoteTasks = false
+    }
+
+    private func handleEmptyStateCreateTap() {
+        if appState.canCreateNewTasks {
+            showCreateTask = true
+        } else {
+            showSubscriptionGate = true
+        }
     }
 }
 
