@@ -8,6 +8,7 @@ struct TaskCard: View {
     var scheduleText: String? = nil
     var nextStepPreview: String? = nil
     var lastEventPreview: String? = nil
+    var style: GlassCardStyle = .default
     var onTap: (() -> Void)? = nil
 
     var body: some View {
@@ -24,7 +25,7 @@ struct TaskCard: View {
     }
 
     private var cardBody: some View {
-        GlassCard(contentPadding: 14) {
+        GlassCard(style: style, contentPadding: 14) {
             VStack(alignment: .leading, spacing: OneDoneStyle.space10) {
                 HStack(alignment: .top, spacing: OneDoneStyle.space8) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.space4) {
@@ -32,18 +33,22 @@ struct TaskCard: View {
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
                             .lineLimit(2)
+                            .truncationMode(.tail)
+                            .layoutPriority(1)
 
                         if let category {
                             Text(category)
                                 .font(OneDoneStyle.captionFont.weight(.medium))
                                 .foregroundStyle(ODColor.textTertiary)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
                         }
                     }
 
                     Spacer(minLength: 8)
 
                     ODStatusBadge(title: statusTitle, tone: statusTone)
+                        .layoutPriority(2)
                 }
 
                 if let scheduleText {
@@ -51,6 +56,7 @@ struct TaskCard: View {
                         .font(OneDoneStyle.captionFont)
                         .foregroundStyle(ODColor.textSecondary)
                         .lineLimit(1)
+                        .truncationMode(.tail)
                 }
 
                 if let nextStepPreview {
@@ -98,7 +104,8 @@ struct TaskCard: View {
             statusTone: .neutral,
             scheduleText: "Reminder Jun 20",
             nextStepPreview: "Wait for merchant response.",
-            lastEventPreview: "Marked message as sent."
+            lastEventPreview: "Marked message as sent.",
+            style: .muted
         )
     }
     .padding(OneDoneStyle.screenPadding)
