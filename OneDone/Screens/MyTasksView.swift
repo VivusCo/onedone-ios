@@ -13,14 +13,14 @@ struct MyTasksView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "My Tasks",
-                    subtitle: "Follow-through hub for active tasks"
+                    subtitle: "Follow-through hub for active work"
                 )
 
-                ODInfoBanner(
-                    title: "Stay in motion",
-                    message: "Prioritized by what needs your attention first.",
-                    icon: "checklist",
-                    tone: .highlight
+                IllustrationCard(
+                    title: "Keep momentum",
+                    subtitle: "Prioritized by what needs your attention first.",
+                    variant: .focused,
+                    minHeight: 118
                 )
 
                 filterBar
@@ -42,15 +42,19 @@ struct MyTasksView: View {
                         )
                     }
 
-                    ODSecondaryButton(title: "Retry", icon: "arrow.clockwise") {
-                        Task {
-                            await refreshRemoteTasks(showLoading: true)
+                    HStack {
+                        Spacer(minLength: 0)
+                        ODSecondaryButton(title: "Retry", icon: "arrow.clockwise", fullWidth: false) {
+                            Task {
+                                await refreshRemoteTasks(showLoading: true)
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
                 }
 
                 if shouldShowRemoteLoadingState {
-                    ODCard {
+                    ODCard(style: .muted) {
                         HStack(spacing: OneDoneStyle.tightSpacing) {
                             ProgressView()
                                 .tint(ODColor.primary)
@@ -63,19 +67,36 @@ struct MyTasksView: View {
                 }
 
                 if filteredAndSortedTasks.isEmpty {
-                    ODCard {
-                        Text(emptyStateText)
-                            .font(OneDoneStyle.bodyFont)
-                            .foregroundStyle(ODColor.textSecondary)
+                    ODCard(style: .muted) {
+                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                            Text("No tasks in this view")
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
+
+                            Text(emptyStateText)
+                                .font(OneDoneStyle.bodyFont)
+                                .foregroundStyle(ODColor.textSecondary)
+                        }
                     }
                 } else {
-                    ForEach(filteredAndSortedTasks) { task in
-                        NavigationLink {
-                            TaskDetailView(appState: appState, taskID: task.id)
-                        } label: {
-                            taskCard(task)
+                    VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ForEach(filteredAndSortedTasks) { task in
+                            NavigationLink {
+                                TaskDetailView(appState: appState, taskID: task.id)
+                            } label: {
+                                TaskCard(
+                                    title: task.title,
+                                    category: task.category,
+                                    statusTitle: task.status.displayTitle,
+                                    statusTone: tone(for: task.status),
+                                    scheduleText: scheduleText(for: task),
+                                    nextStepPreview: task.currentNextStep,
+                                    lastEventPreview: task.lastEventPreview,
+                                    style: .default
+                                )
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -93,83 +114,41 @@ struct MyTasksView: View {
     }
 
     private var filterBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: OneDoneStyle.tightSpacing) {
-                ForEach(MyTasksFilter.allCases) { filter in
-                    Button {
-                        selectedFilter = filter
-                    } label: {
-                        Text(filter.rawValue)
-                            .font(OneDoneStyle.captionFont.weight(.semibold))
-                            .foregroundStyle(
-                                selectedFilter == filter ? ODColor.primaryContrast : ODColor.textPrimary
-                            )
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(selectedFilter == filter ? ODColor.primary : ODColor.surfaceStrong)
-                            )
-                            .overlay(
-                                Capsule(style: .continuous)
-                                    .stroke(ODColor.border, lineWidth: selectedFilter == filter ? 0 : 1)
-                            )
+        ODCard(contentPadding: 10, style: .muted) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: OneDoneStyle.tightSpacing) {
+                    ForEach(MyTasksFilter.allCases) { filter in
+                        Button {
+                            selectedFilter = filter
+                        } label: {
+                            Text(filter.rawValue)
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
+                                .lineLimit(1)
+                                .foregroundStyle(
+                                    selectedFilter == filter ? ODColor.primaryContrast : ODColor.textPrimary
+                                )
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule(style: .continuous)
+                                        .fill(selectedFilter == filter ? ODColor.primary : ODColor.surfaceStrong)
+                                )
+                                .overlay(
+                                    Capsule(style: .continuous)
+                                        .stroke(
+                                            selectedFilter == filter ? ODColor.primary.opacity(0.0) : ODColor.glassBorder,
+                                            lineWidth: 0.9
+                                        )
+                                )
+                                .fixedSize(horizontal: true, vertical: false)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(filter.rawValue)
                     }
-                    .buttonStyle(.plain)
                 }
+                .padding(.horizontal, 2)
+                .padding(.vertical, 2)
             }
-            .padding(.vertical, 2)
-        }
-    }
-
-    @ViewBuilder
-    private func taskCard(_ task: MockTask) -> some View {
-        ODCard {
-            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(task.title)
-                            .font(OneDoneStyle.cardTitleFont)
-                            .foregroundStyle(ODColor.textPrimary)
-                            .lineLimit(2)
-
-                        Text(task.category)
-                            .font(OneDoneStyle.captionFont.weight(.medium))
-                            .foregroundStyle(ODColor.textMuted)
-                    }
-
-                    Spacer()
-
-                    ODStatusBadge(
-                        title: task.status.displayTitle,
-                        tone: tone(for: task.status)
-                    )
-                }
-
-                if let scheduleText = scheduleText(for: task) {
-                    Label(scheduleText, systemImage: "calendar")
-                        .font(OneDoneStyle.captionFont)
-                        .foregroundStyle(ODColor.textSecondary)
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    previewLine(title: "Next", text: task.currentNextStep)
-                    previewLine(title: "Last", text: task.lastEventPreview)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func previewLine(title: String, text: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Text("\(title):")
-                .font(OneDoneStyle.captionFont.weight(.semibold))
-                .foregroundStyle(ODColor.textSecondary)
-            Text(text)
-                .font(OneDoneStyle.captionFont)
-                .foregroundStyle(ODColor.textSecondary)
-                .lineLimit(1)
         }
     }
 
@@ -203,8 +182,8 @@ struct MyTasksView: View {
     private var emptyStateText: String {
         if selectedFilter == .all {
             return appState.shouldUseRemoteTaskActions
-                ? "No tasks yet. Create one from Home to get started."
-                : "No tasks yet. Create one from Home."
+                ? "No tasks yet. Create one from Task to get started."
+                : "No tasks yet. Create one from Task."
         }
         return "No tasks in \(selectedFilter.rawValue) right now."
     }

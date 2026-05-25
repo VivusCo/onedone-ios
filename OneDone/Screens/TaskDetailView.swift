@@ -23,7 +23,7 @@ struct TaskDetailView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Task Detail",
-                    subtitle: "Keep momentum with clear next steps"
+                    subtitle: "Follow through with clear sections"
                 )
 
                 if let remoteDetailErrorMessage {
@@ -43,15 +43,19 @@ struct TaskDetailView: View {
                         )
                     }
 
-                    ODSecondaryButton(title: "Retry", icon: "arrow.clockwise") {
-                        Task {
-                            await refreshRemoteTaskDetail(showLoading: true)
+                    HStack {
+                        Spacer(minLength: 0)
+                        ODSecondaryButton(title: "Retry", icon: "arrow.clockwise", fullWidth: false) {
+                            Task {
+                                await refreshRemoteTaskDetail(showLoading: true)
+                            }
                         }
+                        Spacer(minLength: 0)
                     }
                 }
 
                 if shouldShowRemoteLoadingState {
-                    ODCard {
+                    ODCard(style: .muted) {
                         HStack(spacing: OneDoneStyle.tightSpacing) {
                             ProgressView()
                                 .tint(ODColor.primary)
@@ -64,6 +68,13 @@ struct TaskDetailView: View {
                 }
 
                 if let task {
+                    IllustrationCard(
+                        title: "Stay focused",
+                        subtitle: "One clear next step at a time.",
+                        variant: .focused,
+                        minHeight: 104
+                    )
+
                     headerSection(task)
                     statusSection(task)
                     nextStepSection(task)
@@ -77,7 +88,7 @@ struct TaskDetailView: View {
                     reminderSection(task)
                     timelineSection(task)
                 } else {
-                    ODCard {
+                    ODCard(style: .muted) {
                         Text(
                             appState.shouldUseRemoteTaskActions
                                 ? "Task details are not available yet. Pull to refresh or return to My Tasks."
@@ -105,17 +116,19 @@ struct TaskDetailView: View {
     }
 
     private func headerSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .strong) {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Header")
 
                 Text(task.title)
                     .font(OneDoneStyle.cardTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
+                    .lineLimit(3)
 
                 Text(task.category)
                     .font(OneDoneStyle.captionFont.weight(.medium))
-                    .foregroundStyle(ODColor.textMuted)
+                    .foregroundStyle(ODColor.textTertiary)
+                    .lineLimit(1)
 
                 Text("Created \(dateTimeFormatter.string(from: task.createdAt))")
                     .font(OneDoneStyle.captionFont)
@@ -125,53 +138,61 @@ struct TaskDetailView: View {
     }
 
     private func statusSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .muted) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Status")
 
-                HStack {
-                    ODStatusBadge(title: task.status.displayTitle, tone: tone(for: task.status))
-                    Spacer()
-                    if let dateLabel = dueOrReminderText(task) {
-                        Text(dateLabel)
-                            .font(OneDoneStyle.captionFont)
-                            .foregroundStyle(ODColor.textSecondary)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ODStatusBadge(title: task.status.displayTitle, tone: tone(for: task.status))
+                        ODStatusBadge(
+                            title: appState.canCreateNewTasks ? "Access active" : "Access limited",
+                            tone: appState.canCreateNewTasks ? .success : .locked
+                        )
+
+                        if let dateLabel = dueOrReminderText(task) {
+                            ODStatusBadge(title: dateLabel, tone: .neutral)
+                        }
                     }
+                    .padding(.vertical, 2)
                 }
             }
         }
     }
 
     private func nextStepSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .strong) {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Current next step")
                 Text(task.currentNextStep)
                     .font(OneDoneStyle.bodyFont)
                     .foregroundStyle(ODColor.textSecondary)
+                    .lineLimit(4)
             }
         }
     }
 
     private func checklistSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                cardTitle("Checklist")
+                HStack {
+                    cardTitle("Checklist")
+                    Spacer()
+                    if !task.actionPlan.isEmpty {
+                        Text("\(task.actionPlan.count) items")
+                            .font(OneDoneStyle.captionFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                }
 
                 if task.actionPlan.isEmpty {
                     Text("No checklist items yet.")
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
                 } else {
-                    ForEach(Array(task.actionPlan.enumerated()), id: \.offset) { index, step in
-                        HStack(alignment: .top, spacing: 8) {
-                            Text("\(index + 1).")
-                                .font(OneDoneStyle.captionFont.weight(.semibold))
-                                .foregroundStyle(ODColor.primary)
-                                .padding(.top, 2)
-                            Text(step)
-                                .font(OneDoneStyle.bodyFont)
-                                .foregroundStyle(ODColor.textSecondary)
+                    VStack(spacing: OneDoneStyle.tightSpacing) {
+                        ForEach(Array(task.actionPlan.enumerated()), id: \.offset) { _, step in
+                            ChecklistRow(text: step, isChecked: false, isEnabled: true, onToggle: nil)
                         }
                     }
                 }
@@ -180,24 +201,26 @@ struct TaskDetailView: View {
     }
 
     private func latestOutputSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Latest AI output")
                 Text(task.latestAIOutput)
                     .font(OneDoneStyle.bodyFont)
                     .foregroundStyle(ODColor.textSecondary)
+                    .lineLimit(6)
             }
         }
     }
 
     @ViewBuilder
     private func replyDraftSection(_ task: MockTask, replyDraft: String) -> some View {
-        ODCard {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Reply draft")
                 Text(replyDraft)
                     .font(OneDoneStyle.bodyFont)
                     .foregroundStyle(ODColor.textSecondary)
+                    .lineLimit(5)
 
                 NavigationLink {
                     DraftReplyView(appState: appState, taskID: task.id)
@@ -218,7 +241,7 @@ struct TaskDetailView: View {
     }
 
     private func reminderSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .muted) {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Reminder")
 
@@ -317,7 +340,7 @@ struct TaskDetailView: View {
     }
 
     private func timelineSection(_ task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Timeline")
 
@@ -326,21 +349,34 @@ struct TaskDetailView: View {
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
                 } else {
-                    ForEach(compactTimeline(for: task)) { entry in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text(entry.title)
-                                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                                    .foregroundStyle(ODColor.textPrimary)
-                                Spacer()
-                                Text(dateFormatter.string(from: entry.date))
+                    VStack(spacing: OneDoneStyle.tightSpacing) {
+                        ForEach(compactTimeline(for: task)) { entry in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    Text(entry.title)
+                                        .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                                        .foregroundStyle(ODColor.textPrimary)
+                                        .lineLimit(1)
+
+                                    Spacer()
+
+                                    Text(dateFormatter.string(from: entry.date))
+                                        .font(OneDoneStyle.captionFont)
+                                        .foregroundStyle(ODColor.textMuted)
+                                        .lineLimit(1)
+                                }
+
+                                Text(entry.detail)
                                     .font(OneDoneStyle.captionFont)
-                                    .foregroundStyle(ODColor.textMuted)
+                                    .foregroundStyle(ODColor.textSecondary)
+                                    .lineLimit(2)
                             }
-                            Text(entry.detail)
-                                .font(OneDoneStyle.captionFont)
-                                .foregroundStyle(ODColor.textSecondary)
-                                .lineLimit(2)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: OneDoneStyle.radius12, style: .continuous)
+                                    .fill(ODColor.glassFillSecondary)
+                            )
                         }
                     }
                 }
