@@ -8,19 +8,22 @@ struct ElevatedTaskTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 8) {
+            VStack(spacing: 6) {
                 ZStack {
                     Circle()
-                        .fill(ODColor.backgroundWarm.opacity(0.98))
-                        .frame(width: 74, height: 74)
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 68, height: 68)
                         .overlay(
                             Circle()
-                                .fill(.ultraThinMaterial)
-                                .opacity(0.74)
+                                .fill(ODColor.backgroundWarm.opacity(0.98))
                         )
                         .overlay(
                             Circle()
-                                .stroke(ODColor.glassBorder.opacity(0.96), lineWidth: 1.0)
+                                .stroke(ODColor.glassBorder.opacity(0.95), lineWidth: 0.9)
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(ODColor.backgroundWarm.opacity(0.98), lineWidth: 4.5)
                         )
 
                     Circle()
@@ -34,24 +37,25 @@ struct ElevatedTaskTabButton: View {
                                 endPoint: .bottom
                             )
                         )
-                        .frame(width: 62, height: 62)
+                        .frame(width: 56, height: 56)
                         .overlay(
                             Circle()
-                                .stroke(Color.white.opacity(0.30), lineWidth: 1.0)
+                                .stroke(Color.white.opacity(0.28), lineWidth: 0.9)
                         )
                         .overlay(alignment: .top) {
                             Circle()
                                 .fill(Color.white.opacity(0.18))
-                                .frame(width: 30, height: 11)
-                                .blur(radius: 5.5)
-                                .offset(y: 8.5)
+                                .frame(width: 26, height: 9)
+                                .blur(radius: 4.5)
+                                .offset(y: 7)
                         }
-                        .shadow(color: Color.black.opacity(0.13), radius: 13, x: 0, y: 9)
-                        .shadow(color: ODColor.accentPrimaryDeepGreen.opacity(0.20), radius: 5, x: 0, y: 4)
+                        .shadow(color: Color.black.opacity(0.16), radius: 12, x: 0, y: 8)
+                        .shadow(color: ODColor.accentPrimaryDeepGreen.opacity(0.22), radius: 4, x: 0, y: 3)
 
                     Image(systemName: "plus")
-                        .font(.system(size: 21, weight: .bold))
+                        .font(.system(size: 23, weight: .regular))
                         .foregroundStyle(ODColor.accentPrimaryContrast)
+                        .offset(y: -1)
                 }
 
                 Text(title)
@@ -59,8 +63,8 @@ struct ElevatedTaskTabButton: View {
                     .foregroundStyle(ODColor.accentPrimaryDeepGreen)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
