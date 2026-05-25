@@ -8,8 +8,20 @@ struct ElevatedTaskTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 6) {
+            VStack(spacing: 7) {
                 ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
+                        .frame(width: 76, height: 76)
+                        .overlay(
+                            Circle()
+                                .fill(ODColor.glassFillPrimary.opacity(0.92))
+                        )
+                        .overlay(
+                            Circle()
+                                .stroke(ODColor.glassBorder.opacity(0.96), lineWidth: 1.05)
+                        )
+
                     Circle()
                         .fill(
                             LinearGradient(
@@ -21,12 +33,20 @@ struct ElevatedTaskTabButton: View {
                                 endPoint: .bottom
                             )
                         )
-                        .frame(width: 62, height: 62)
+                        .frame(width: 60, height: 60)
                         .overlay(
                             Circle()
-                                .stroke(Color.white.opacity(0.26), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.34), lineWidth: 1)
                         )
-                        .shadow(color: ODColor.glassShadow.opacity(0.95), radius: 14, x: 0, y: 8)
+                        .overlay(alignment: .top) {
+                            Circle()
+                                .fill(Color.white.opacity(0.24))
+                                .frame(width: 28, height: 10)
+                                .blur(radius: 5)
+                                .offset(y: 8)
+                        }
+                        .shadow(color: Color.black.opacity(0.14), radius: 14, x: 0, y: 9)
+                        .shadow(color: ODColor.accentPrimaryDeepGreen.opacity(0.22), radius: 6, x: 0, y: 4)
 
                     Image(systemName: "plus")
                         .font(.system(size: 20, weight: .bold))
@@ -38,19 +58,25 @@ struct ElevatedTaskTabButton: View {
                     .foregroundStyle(ODColor.textPrimary)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .padding(.top, 4)
+            .padding(.bottom, 2)
             .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
                     .fill(.ultraThinMaterial)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.85)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(ODColor.glassFillSecondary.opacity(0.88))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(ODColor.glassBorder.opacity(0.86), lineWidth: 0.8)
                     )
             )
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
+        .opacity(isDisabled ? 0.62 : 1.0)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Opens task creation")
         .accessibilityAddTraits(.isButton)
