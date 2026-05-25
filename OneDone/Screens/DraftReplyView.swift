@@ -96,7 +96,7 @@ struct DraftReplyView: View {
     }
 
     private func subjectSection(task: MockTask) -> some View {
-        ODCard {
+        ODCard(style: .strong) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Subject")
                 TextField("Subject", text: $subject)
@@ -114,15 +114,22 @@ struct DraftReplyView: View {
 
                 Text(task.title)
                     .font(OneDoneStyle.captionFont)
-                    .foregroundStyle(ODColor.textMuted)
+                    .foregroundStyle(ODColor.textTertiary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
         }
     }
 
     private var messageBodySection: some View {
-        ODCard {
+        ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                cardTitle("Message body")
+                HStack(alignment: .center, spacing: OneDoneStyle.tightSpacing) {
+                    cardTitle("Message body")
+                    Spacer()
+                    compactCopyButton
+                }
+
                 TextEditor(text: $messageBody)
                     .font(OneDoneStyle.bodyFont)
                     .frame(minHeight: 180)
@@ -135,12 +142,19 @@ struct DraftReplyView: View {
                         RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
                             .stroke(ODColor.border, lineWidth: 1)
                     )
+
+                if didCopy {
+                    Label("Copied", systemImage: "checkmark.circle.fill")
+                        .font(OneDoneStyle.captionFont.weight(.semibold))
+                        .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                        .accessibilityLabel("Copied to clipboard")
+                }
             }
         }
     }
 
     private var toneSection: some View {
-        ODCard {
+        ODCard(style: .muted) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Tone")
                 Picker("Tone", selection: $selectedTone) {
@@ -154,7 +168,7 @@ struct DraftReplyView: View {
     }
 
     private var languageSection: some View {
-        ODCard {
+        ODCard(style: .muted) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Language")
 
@@ -177,7 +191,7 @@ struct DraftReplyView: View {
                                     )
                                     .overlay(
                                         Capsule(style: .continuous)
-                                            .stroke(ODColor.border, lineWidth: selectedLanguage == language ? 0 : 1)
+                                            .stroke(ODColor.glassBorder, lineWidth: selectedLanguage == language ? 0 : 1)
                                     )
                             }
                             .buttonStyle(.plain)
@@ -190,14 +204,6 @@ struct DraftReplyView: View {
 
     private var actionsSection: some View {
         VStack(spacing: OneDoneStyle.contentSpacing) {
-            ODPrimaryButton(
-                title: didCopy ? "Copied" : "Copy",
-                icon: didCopy ? "checkmark" : "doc.on.doc",
-                isDisabled: messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSyncActionInProgress || isRegeneratingReply
-            ) {
-                copyDraft()
-            }
-
             ODSecondaryButton(
                 title: isRegeneratingReply ? "Regenerating..." : "Regenerate",
                 icon: "arrow.clockwise",
@@ -212,6 +218,7 @@ struct DraftReplyView: View {
                     await regenerateDraft()
                 }
             }
+            .frame(maxWidth: 340)
 
             if isRegeneratingReply {
                 HStack(spacing: OneDoneStyle.tightSpacing) {
@@ -226,37 +233,41 @@ struct DraftReplyView: View {
     }
 
     private var postCopyPromptSection: some View {
-        ODCard {
+        ODCard(style: .strong) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 Text("Did you send it?")
                     .font(OneDoneStyle.cardTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
 
-                ODPrimaryButton(
-                    title: "Yes, I sent it",
-                    icon: "checkmark.circle.fill",
-                    isDisabled: isSyncActionInProgress
-                ) {
-                    Task {
-                        await markAsSent()
+                VStack(spacing: OneDoneStyle.contentSpacing) {
+                    ODPrimaryButton(
+                        title: "Yes, I sent it",
+                        icon: "checkmark.circle.fill",
+                        isDisabled: isSyncActionInProgress
+                    ) {
+                        Task {
+                            await markAsSent()
+                        }
+                    }
+
+                    ODSecondaryButton(title: "Not yet", icon: "clock", isDisabled: isSyncActionInProgress) {
+                        showPostCopyPrompt = false
+                    }
+
+                    ODSecondaryButton(title: "Remind me later", icon: "bell", isDisabled: isSyncActionInProgress) {
+                        Task {
+                            await remindMeLater()
+                        }
                     }
                 }
-
-                ODSecondaryButton(title: "Not yet", icon: "clock", isDisabled: isSyncActionInProgress) {
-                    showPostCopyPrompt = false
-                }
-
-                ODSecondaryButton(title: "Remind me later", icon: "bell", isDisabled: isSyncActionInProgress) {
-                    Task {
-                        await remindMeLater()
-                    }
-                }
+                .frame(maxWidth: 340)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }
 
     private var followUpReminderSection: some View {
-        ODCard {
+        ODCard(style: .muted) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 Text("Set follow-up reminder")
                     .font(OneDoneStyle.cardTitleFont)
@@ -271,8 +282,41 @@ struct DraftReplyView: View {
                     reminderButton(title: "In 2 days", hours: 48)
                     reminderButton(title: "In 3 days", hours: 72)
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
+    }
+
+    private var compactCopyButton: some View {
+        Button {
+            copyDraft()
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: didCopy ? "checkmark" : "doc.on.doc")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("Copy")
+                    .font(OneDoneStyle.captionFont.weight(.semibold))
+            }
+            .foregroundStyle(
+                messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSyncActionInProgress || isRegeneratingReply
+                    ? ODColor.textTertiary
+                    : ODColor.accentPrimaryDeepGreen
+            )
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(ODColor.glassFillSecondary)
+            )
+            .overlay(
+                Capsule(style: .continuous)
+                    .stroke(ODColor.glassBorder, lineWidth: 0.9)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(messageBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSyncActionInProgress || isRegeneratingReply)
+        .accessibilityLabel("Copy")
+        .accessibilityHint("Copies the draft to clipboard")
     }
 
     private func reminderButton(title: String, hours: Int) -> some View {

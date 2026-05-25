@@ -1072,7 +1072,16 @@ final class AppState {
             async let events = services.taskService.fetchTaskEvents(taskID: backendTaskID)
             async let checklist = services.taskService.fetchChecklistItems(taskID: backendTaskID)
 
-            let reminders = (try? await services.reminderService.fetchReminders(taskID: backendTaskID)) ?? []
+            let reminders: [BackendReminderDTO]
+            do {
+                reminders = try await services.reminderService.fetchReminders(taskID: backendTaskID)
+            } catch {
+#if DEBUG
+                let message = (error as? LocalizedError)?.errorDescription ?? String(describing: error)
+                print("[OneDone][RemoteRead] endpoint=get-reminders stage=fallback_to_empty_reminders task_id=\(backendTaskID) reason=\(message)")
+#endif
+                reminders = []
+            }
             let detailPayload = try await detail
             let outputsPayload = try await outputs
             let eventsPayload = try await events

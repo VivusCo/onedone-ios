@@ -116,8 +116,13 @@ struct RemoteReminderService: ReminderServiceProtocol {
 
     private func get(endpoint: String, queryItems: [URLQueryItem]) async throws -> Data {
         guard let url = edgeFunctionURL(endpoint: endpoint, queryItems: queryItems) else {
+#if DEBUG
+            print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=dispatch_skipped reason=missing_base_url")
+#endif
             throw ReminderSyncServiceError.missingBaseURL
         }
+
+        logReadDispatch(endpoint: endpoint, url: url, queryItems: queryItems)
 
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
@@ -132,6 +137,11 @@ struct RemoteReminderService: ReminderServiceProtocol {
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw ReminderSyncServiceError.invalidResponse
             }
+            logReadResponseReceived(
+                endpoint: endpoint,
+                statusCode: httpResponse.statusCode,
+                data: data
+            )
 
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 402 || httpResponse.statusCode == 403 {
                 logReadHTTPFailure(endpoint: endpoint, statusCode: httpResponse.statusCode, data: data)
@@ -468,9 +478,13 @@ struct RemoteReminderService: ReminderServiceProtocol {
 
     private func logReadHTTPFailure(endpoint: String, statusCode: Int, data: Data) {
 #if DEBUG
-        let keys = topLevelJSONKeys(from: data)
-        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        print("[OneDone][RemoteRead] endpoint=\(endpoint) status=\(statusCode) keys=\(keysDescription)")
+        let details = backendErrorDetailsForLog(from: data)
+        let backendCode = details?.code ?? "none"
+        let backendMessage = details?.message ?? "none"
+        print(
+            "[OneDone][RemoteRead] endpoint=\(endpoint) stage=http_failure status=\(statusCode) " +
+            "backend_code=\(backendCode) backend_message=\(backendMessage)"
+        )
 #endif
     }
 
@@ -478,7 +492,24 @@ struct RemoteReminderService: ReminderServiceProtocol {
 #if DEBUG
         let keys = topLevelJSONKeys(from: data)
         let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        print("[OneDone][RemoteReadDecode] endpoint=\(endpoint) keys=\(keysDescription)")
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=decode_failure keys=\(keysDescription)")
+#endif
+    }
+
+    private func logReadDispatch(endpoint: String, url: URL, queryItems: [URLQueryItem]) {
+#if DEBUG
+        let host = url.host ?? "unknown"
+        let path = url.path
+        let taskID = queryItems.first(where: { $0.name == "task_id" })?.value ?? "none"
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=dispatching host=\(host) path=\(path) task_id=\(taskID)")
+#endif
+    }
+
+    private func logReadResponseReceived(endpoint: String, statusCode: Int, data: Data) {
+#if DEBUG
+        let keys = topLevelJSONKeys(from: data)
+        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
+        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=response_received status=\(statusCode) keys=\(keysDescription)")
 #endif
     }
 
@@ -488,6 +519,53 @@ struct RemoteReminderService: ReminderServiceProtocol {
             return []
         }
         return dictionary.keys.sorted()
+    }
+
+    private func backendErrorDetailsForLog(from data: Data) -> (code: String, message: String)? {
+        struct BackendErrorPayload: Decodable {
+            struct NestedError: Decodable {
+                let code: String?
+                let message: String?
+            }
+
+            let error: NestedError?
+            let code: String?
+            let errorCode: String?
+            let message: String?
+            let errorMessage: String?
+
+            enum CodingKeys: String, CodingKey {
+                case error
+                case code
+                case errorCode = "error_code"
+                case message
+                case errorMessage = "error_message"
+            }
+        }
+
+        guard let payload = try? JSONDecoder().decode(BackendErrorPayload.self, from: data) else {
+            return nil
+        }
+
+        let code = logSafeValue(payload.error?.code ?? payload.errorCode ?? payload.code)
+        let message = logSafeValue(
+            sanitizeBackendMessage(payload.error?.message ?? payload.errorMessage ?? payload.message)
+        )
+
+        guard code != nil || message != nil else {
+            return nil
+        }
+
+        return (code ?? "none", message ?? "none")
+    }
+
+    private func logSafeValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let compact = trimmed.replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+        return String(compact.prefix(240))
     }
 }
 
