@@ -4,7 +4,7 @@ struct ODComingSoonBadge: View {
     var text: String = "Coming soon"
 
     var body: some View {
-        ODStatusBadge(title: text, tone: .warning)
+        ODStatusBadge(title: text, tone: .locked)
     }
 }
 

@@ -27,11 +27,15 @@ struct ODInfoBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                .fill(tone.backgroundColor)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                        .fill(tone.backgroundColor.opacity(0.82))
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                .stroke(ODColor.border.opacity(0.7), lineWidth: 1)
+                .stroke(ODColor.glassBorder, lineWidth: 0.9)
         )
     }
 }
