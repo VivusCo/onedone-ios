@@ -11,47 +11,28 @@ struct TemplatesView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Templates",
-                    subtitle: "Quick text starters for common tasks"
-                )
-
-                ODInfoBanner(
-                    title: "Text-first workflow",
-                    message: "Paste the message, bill, or document text. Upload is not part of this MVP.",
-                    icon: "text.alignleft"
-                )
-
-                ODStatusBadge(
-                    title: appState.canCreateNewTasks ? "Creation unlocked" : "Creation locked",
-                    tone: appState.canCreateNewTasks ? .highlight : .warning
+                    subtitle: appState.canCreateNewTasks
+                        ? "Start with a familiar situation."
+                        : "Creation is locked. Tap any template to open access options."
                 )
 
                 if appState.templates.isEmpty {
-                    ODCard {
-                        Text("No templates available in this mock state.")
+                    ODCard(style: .muted) {
+                        Text("No templates available right now.")
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 } else {
-                    ForEach(appState.templates) { template in
-                        Button {
-                            handleTemplateTap(template)
-                        } label: {
-                            ODCard {
-                                VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                                    Text(template.title)
-                                        .font(OneDoneStyle.cardTitleFont)
-                                        .foregroundStyle(ODColor.textPrimary)
-
-                                    Text(template.promptHint)
-                                        .font(OneDoneStyle.subheadlineFont)
-                                        .foregroundStyle(ODColor.textSecondary)
-                                        .lineLimit(3)
-
-                                    ODStatusBadge(title: "Focus: \(template.focus)", tone: .neutral)
-                                }
+                    VStack(spacing: OneDoneStyle.contentSpacing) {
+                        ForEach(appState.templates) { template in
+                            Button {
+                                handleTemplateTap(template)
+                            } label: {
+                                templateRow(template)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(template.title)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -77,6 +58,101 @@ struct TemplatesView: View {
         .oneDoneScreen()
     }
 
+    private func templateRow(_ template: TaskTemplate) -> some View {
+        ODCard(contentPadding: 14, style: .default) {
+            HStack(spacing: OneDoneStyle.contentSpacing) {
+                templateOrb(icon: templateIcon(for: template), tone: templateOrbTone(for: template))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(template.title)
+                        .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                        .foregroundStyle(ODColor.textPrimary)
+                        .lineLimit(1)
+
+                    Text(templateSubtitle(for: template))
+                        .font(OneDoneStyle.captionFont)
+                        .foregroundStyle(ODColor.textSecondary)
+                        .lineLimit(2)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ODColor.textTertiary)
+            }
+            .frame(minHeight: 62)
+        }
+    }
+
+    private func templateOrb(icon: String, tone: TemplateOrbTone) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
+                        .fill(tone.background)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
+                        .stroke(ODColor.glassBorder, lineWidth: 0.85)
+                )
+                .frame(width: 44, height: 44)
+
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(tone.foreground)
+        }
+    }
+
+    private func templateIcon(for template: TaskTemplate) -> String {
+        switch template.resolvedBackendTemplateID {
+        case "cancel_subscription":
+            return "wallet.pass"
+        case "return_item":
+            return "arrow.uturn.backward.circle"
+        case "request_refund":
+            return "arrow.counterclockwise.circle"
+        case "understand_bill":
+            return "doc.text"
+        case "write_complaint":
+            return "exclamationmark.bubble"
+        case "reply_to_message":
+            return "bubble.left.and.text.bubble.right"
+        default:
+            return "sparkles"
+        }
+    }
+
+    private func templateSubtitle(for template: TaskTemplate) -> String {
+        switch template.resolvedBackendTemplateID {
+        case "cancel_subscription":
+            return "Find where it started and what to do next."
+        case "return_item":
+            return "Prepare evidence and a clear message."
+        case "request_refund":
+            return "Ask clearly without overexplaining."
+        case "understand_bill":
+            return "Paste the bill text and break down charges."
+        case "write_complaint":
+            return "Firm, polite, and useful wording."
+        case "reply_to_message":
+            return "Draft a calm and respectful response."
+        default:
+            return template.focus
+        }
+    }
+
+    private func templateOrbTone(for template: TaskTemplate) -> TemplateOrbTone {
+        switch template.resolvedBackendTemplateID {
+        case "request_refund":
+            return .warm
+        case "cancel_subscription", "reply_to_message", "understand_bill", "return_item", "write_complaint":
+            return .primary
+        default:
+            return .neutral
+        }
+    }
+
     private func handleTemplateTap(_ template: TaskTemplate) {
         if appState.canCreateNewTasks {
             selectedTemplateForTask = template
@@ -84,6 +160,34 @@ struct TemplatesView: View {
         }
 
         showSubscriptionGate = true
+    }
+}
+
+private enum TemplateOrbTone {
+    case primary
+    case warm
+    case neutral
+
+    var background: Color {
+        switch self {
+        case .primary:
+            return ODColor.primarySoft
+        case .warm:
+            return ODColor.statusWarningFill
+        case .neutral:
+            return ODColor.statusNeutralFill
+        }
+    }
+
+    var foreground: Color {
+        switch self {
+        case .primary:
+            return ODColor.accentPrimaryDeepGreen
+        case .warm:
+            return ODColor.accentWarmOrangeSoft
+        case .neutral:
+            return ODColor.textSecondary
+        }
     }
 }
 

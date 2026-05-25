@@ -10,7 +10,7 @@ struct HomeView: View {
     private let shortcuts: [HomeShortcut] = [
         HomeShortcut(
             title: "Cancel subscription",
-            subtitle: "Stop recurring charges with clear steps.",
+            subtitle: "Stop recurring charges.",
             icon: "xmark.circle",
             templateTitle: "Cancel a subscription",
             backendTemplateID: "cancel_subscription",
@@ -18,7 +18,7 @@ struct HomeView: View {
         ),
         HomeShortcut(
             title: "Request refund",
-            subtitle: "Write a calm request with the right details.",
+            subtitle: "Ask clearly and calmly.",
             icon: "creditcard.and.123",
             templateTitle: "Request a refund",
             backendTemplateID: "request_refund",
@@ -26,7 +26,7 @@ struct HomeView: View {
         ),
         HomeShortcut(
             title: "Understand bill",
-            subtitle: "Break down charges in plain language.",
+            subtitle: "Break down each charge.",
             icon: "doc.text.magnifyingglass",
             templateTitle: "Understand a bill",
             backendTemplateID: "understand_bill",
@@ -34,7 +34,7 @@ struct HomeView: View {
         ),
         HomeShortcut(
             title: "Reply politely",
-            subtitle: "Draft a clear, respectful response.",
+            subtitle: "Draft a respectful response.",
             icon: "bubble.left.and.text.bubble.right",
             templateTitle: "Reply to a message",
             backendTemplateID: "reply_to_message",
@@ -47,10 +47,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 headerBar
 
-                ODStatusBadge(
-                    title: accessIndicatorTitle,
-                    tone: accessIndicatorTone
-                )
+                accessTopRow
 
                 if let accessStatusNote = appState.accessStatusNote {
                     ODInfoBanner(
@@ -62,11 +59,13 @@ struct HomeView: View {
                 }
 
                 IllustrationCard(
-                    title: "One small thing, done.",
-                    subtitle: "Pick a shortcut below or tap the Task button to start from scratch.",
+                    title: "From messy to manageable",
+                    subtitle: "OneDone turns vague admin stress into a clear next step.",
                     variant: .calm,
-                    minHeight: 126
+                    minHeight: 124
                 )
+
+                quickActionsSection
 
                 nextUpSection
 
@@ -84,8 +83,6 @@ struct HomeView: View {
                         }
                     }
                 }
-
-                quickActionsSection
             }
             .padding(OneDoneStyle.screenPadding)
         }
@@ -115,11 +112,16 @@ struct HomeView: View {
     }
 
     private var headerBar: some View {
-        HStack(alignment: .center, spacing: OneDoneStyle.contentSpacing) {
-            ODSectionHeader(
-                title: "Welcome",
-                subtitle: "Overview and shortcuts"
-            )
+        HStack(alignment: .top, spacing: OneDoneStyle.contentSpacing) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Good morning")
+                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .foregroundStyle(ODColor.textPrimary)
+
+                Text("Pick one admin task and move it forward.")
+                    .font(OneDoneStyle.subheadlineFont)
+                    .foregroundStyle(ODColor.textSecondary)
+            }
 
             Spacer()
 
@@ -128,10 +130,10 @@ struct HomeView: View {
                 .foregroundStyle(ODColor.primary)
                 .padding(10)
                 .background(
-                    Circle()
+                    RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
                         .fill(.ultraThinMaterial)
                         .overlay(
-                            Circle()
+                            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
                                 .stroke(ODColor.glassBorder, lineWidth: 0.85)
                         )
                 )
@@ -139,29 +141,56 @@ struct HomeView: View {
         }
     }
 
+    private var accessTopRow: some View {
+        HStack(spacing: OneDoneStyle.tightSpacing) {
+            ODStatusBadge(
+                title: accessIndicatorTitle,
+                tone: accessIndicatorTone
+            )
+
+            Spacer()
+
+            Text("Tap + to add")
+                .font(OneDoneStyle.captionFont.weight(.semibold))
+                .foregroundStyle(ODColor.textSecondary)
+        }
+    }
+
     @ViewBuilder
     private var nextUpSection: some View {
         if let nextUpTask {
-            ODCard(contentPadding: 14, style: .strong) {
+            ODCard(contentPadding: 14, style: .default) {
                 VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                    Text("Next up")
-                        .font(OneDoneStyle.captionFont.weight(.semibold))
-                        .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Next up")
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
+                                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
 
-                    Text(nextUpTask.title)
-                        .font(OneDoneStyle.cardTitleFont)
-                        .foregroundStyle(ODColor.textPrimary)
-                        .lineLimit(2)
+                            Text(nextUpTask.title)
+                                .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                                .foregroundStyle(ODColor.textPrimary)
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 8)
+
+                        ODStatusBadge(
+                            title: nextUpTask.status.displayTitle,
+                            tone: statusTone(for: nextUpTask.status)
+                        )
+                    }
 
                     Text(nextUpTask.currentNextStep)
-                        .font(OneDoneStyle.subheadlineFont)
+                        .font(OneDoneStyle.captionFont)
                         .foregroundStyle(ODColor.textSecondary)
-                        .lineLimit(2)
+                        .lineLimit(1)
 
                     if let dateText = scheduleText(for: nextUpTask) {
-                        Label(dateText, systemImage: "calendar")
+                        Text(dateText)
                             .font(OneDoneStyle.captionFont)
-                            .foregroundStyle(ODColor.textSecondary)
+                            .foregroundStyle(ODColor.textTertiary)
+                            .lineLimit(1)
                     }
                 }
             }
@@ -173,11 +202,11 @@ struct HomeView: View {
                         .foregroundStyle(ODColor.accentPrimaryDeepGreen)
 
                     Text("No active task yet")
-                        .font(OneDoneStyle.cardTitleFont)
+                        .font(OneDoneStyle.subheadlineFont.weight(.semibold))
                         .foregroundStyle(ODColor.textPrimary)
 
                     Text("Tap the Task button below to create your first task.")
-                        .font(OneDoneStyle.subheadlineFont)
+                        .font(OneDoneStyle.captionFont)
                         .foregroundStyle(ODColor.textSecondary)
                 }
             }
@@ -185,50 +214,65 @@ struct HomeView: View {
     }
 
     private var quickActionsSection: some View {
-        VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-            Text("Quick shortcuts")
-                .font(OneDoneStyle.cardTitleFont)
-                .foregroundStyle(ODColor.textPrimary)
+        ODCard(style: .default) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("What OneDone can help with")
+                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .foregroundStyle(ODColor.textPrimary)
 
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: OneDoneStyle.contentSpacing) {
-                ForEach(shortcuts) { shortcut in
-                    Button {
-                        handleShortcutTap(shortcut)
-                    } label: {
-                        GlassCard(contentPadding: 14) {
-                            VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                                HStack {
-                                    Image(systemName: shortcut.icon)
-                                        .font(.system(size: 14, weight: .semibold))
-                                        .foregroundStyle(ODColor.primary)
+                    Text("Choose a shortcut or tap + to start fresh.")
+                        .font(OneDoneStyle.captionFont)
+                        .foregroundStyle(ODColor.textSecondary)
+                }
 
-                                    Spacer(minLength: 8)
-
-                                    Image(systemName: "arrow.up.right")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(ODColor.primary)
-                                }
-
-                                Text(shortcut.title)
-                                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                                    .foregroundStyle(ODColor.textPrimary)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(2)
-
-                                Text(shortcut.subtitle)
-                                    .font(OneDoneStyle.captionFont)
-                                    .foregroundStyle(ODColor.textSecondary)
-                                    .multilineTextAlignment(.leading)
-                                    .lineLimit(3)
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: OneDoneStyle.contentSpacing) {
+                    ForEach(shortcuts) { shortcut in
+                        Button {
+                            handleShortcutTap(shortcut)
+                        } label: {
+                            shortcutTile(shortcut)
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(shortcut.title)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(shortcut.title)
                 }
             }
         }
+    }
+
+    private func shortcutTile(_ shortcut: HomeShortcut) -> some View {
+        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: shortcut.icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+
+            Text(shortcut.title)
+                .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                .foregroundStyle(ODColor.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+
+            Text(shortcut.subtitle)
+                .font(OneDoneStyle.captionFont)
+                .foregroundStyle(ODColor.textSecondary)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, minHeight: 104, alignment: .topLeading)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                        .fill(ODColor.glassFillSecondary)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                .stroke(ODColor.glassBorder, lineWidth: 0.85)
+        )
     }
 
     private func handleShortcutTap(_ shortcut: HomeShortcut) {
@@ -302,6 +346,19 @@ struct HomeView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter
+    }
+
+    private func statusTone(for status: TaskStatus) -> ODStatusTone {
+        switch status {
+        case .followUpNeeded, .dueSoon, .needsClarification:
+            return .warning
+        case .waitingForReply, .inProgress, .postponed:
+            return .neutral
+        case .new, .ready, .draft:
+            return .highlight
+        case .done:
+            return .success
+        }
     }
 
     private var accessIndicatorTitle: String {
