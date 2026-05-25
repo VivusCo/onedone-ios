@@ -478,9 +478,13 @@ struct RemoteReminderService: ReminderServiceProtocol {
 
     private func logReadHTTPFailure(endpoint: String, statusCode: Int, data: Data) {
 #if DEBUG
-        let keys = topLevelJSONKeys(from: data)
-        let keysDescription = keys.isEmpty ? "none" : keys.joined(separator: ",")
-        print("[OneDone][RemoteRead] endpoint=\(endpoint) stage=http_failure status=\(statusCode) keys=\(keysDescription)")
+        let details = backendErrorDetailsForLog(from: data)
+        let backendCode = details?.code ?? "none"
+        let backendMessage = details?.message ?? "none"
+        print(
+            "[OneDone][RemoteRead] endpoint=\(endpoint) stage=http_failure status=\(statusCode) " +
+            "backend_code=\(backendCode) backend_message=\(backendMessage)"
+        )
 #endif
     }
 
@@ -515,6 +519,53 @@ struct RemoteReminderService: ReminderServiceProtocol {
             return []
         }
         return dictionary.keys.sorted()
+    }
+
+    private func backendErrorDetailsForLog(from data: Data) -> (code: String, message: String)? {
+        struct BackendErrorPayload: Decodable {
+            struct NestedError: Decodable {
+                let code: String?
+                let message: String?
+            }
+
+            let error: NestedError?
+            let code: String?
+            let errorCode: String?
+            let message: String?
+            let errorMessage: String?
+
+            enum CodingKeys: String, CodingKey {
+                case error
+                case code
+                case errorCode = "error_code"
+                case message
+                case errorMessage = "error_message"
+            }
+        }
+
+        guard let payload = try? JSONDecoder().decode(BackendErrorPayload.self, from: data) else {
+            return nil
+        }
+
+        let code = logSafeValue(payload.error?.code ?? payload.errorCode ?? payload.code)
+        let message = logSafeValue(
+            sanitizeBackendMessage(payload.error?.message ?? payload.errorMessage ?? payload.message)
+        )
+
+        guard code != nil || message != nil else {
+            return nil
+        }
+
+        return (code ?? "none", message ?? "none")
+    }
+
+    private func logSafeValue(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let compact = trimmed.replacingOccurrences(of: "\n", with: " ")
+            .replacingOccurrences(of: "\r", with: " ")
+        return String(compact.prefix(240))
     }
 }
 
