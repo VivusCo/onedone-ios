@@ -583,6 +583,9 @@ struct TaskDetailView: View {
 
         let loadError = await appState.refreshTaskDetailFromRemote(taskID: taskID)
         remoteDetailErrorMessage = loadError
+        if loadError == nil {
+            reminderFeedback = nil
+        }
         isLoadingRemoteTaskDetail = false
     }
 }
