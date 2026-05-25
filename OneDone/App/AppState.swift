@@ -1693,7 +1693,10 @@ final class AppState {
             return "Your session may have expired. Please log in again."
         case let taskError as TaskActionServiceError:
             switch taskError {
-            case .accessDenied:
+            case let .accessDenied(message):
+                if isAuthLikeErrorMessage(message) {
+                    return "Your session may have expired. Please log in again."
+                }
                 return "You do not currently have permission to load tasks."
             case .missingBaseURL, .invalidResponse, .unsupportedResponse:
                 return "Task list is temporarily unavailable. Please try again."
@@ -1715,7 +1718,10 @@ final class AppState {
             return "Your session may have expired. Please log in again."
         case let taskError as TaskActionServiceError:
             switch taskError {
-            case .accessDenied:
+            case let .accessDenied(message):
+                if isAuthLikeErrorMessage(message) {
+                    return "Your session may have expired. Please log in again."
+                }
                 return "You do not currently have permission to view this task."
             case .missingBaseURL, .invalidResponse, .unsupportedResponse:
                 return "Task details are temporarily unavailable. Please try again."
@@ -1990,6 +1996,20 @@ final class AppState {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func isAuthLikeErrorMessage(_ message: String) -> Bool {
+        let normalized = message.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalized.isEmpty {
+            return false
+        }
+
+        return normalized.contains("session") ||
+            normalized.contains("log in") ||
+            normalized.contains("login") ||
+            normalized.contains("unauthorized") ||
+            normalized.contains("token") ||
+            normalized.contains("jwt")
     }
 
     private var isoDateTimeFormatter: ISO8601DateFormatter {
