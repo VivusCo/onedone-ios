@@ -1001,6 +1001,17 @@ Core models:
 27. Wrong-path feedback.
 28. Safety/risk/deadline confidence UI.
 29. Offline read-only.
+30. Remote backend runtime is the default for real app usage.
+31. Mock runtime is for SwiftUI previews and development fallback only.
+32. Supabase Auth email/password is implemented through REST calls over URLSession.
+33. Auth session restore/logout is implemented with Keychain-backed session storage.
+34. Remote API calls use `AuthTokenProvider` for bearer token access.
+35. Backend access-state drives app routing and gating.
+36. Onboarding completion is synced to backend through `POST /complete-onboarding`.
+37. Subscription access sync is implemented with StoreKit 2 plus backend mirror endpoints.
+38. Shared Xcode scheme must stay value-free; concrete env values belong only in local unshared scheme(s).
+39. iOS never calls OpenAI directly.
+40. iOS must never contain Supabase `service_role` key.
 
 ---
 
@@ -1022,3 +1033,53 @@ Register
 ```
 
 That loop is the product.
+
+---
+
+## 26. Current MVP Implementation Architecture
+
+This section reflects the current implemented runtime, not a future plan.
+
+### Runtime modes
+- Remote runtime is the default for real app usage.
+- Mock mode remains for SwiftUI previews and development fallback only.
+- Access-state from backend is the source of truth for routing.
+
+### Auth and session
+- iOS uses Supabase Auth REST endpoints over `URLSession`.
+- Email/password auth is implemented.
+- Session persistence is implemented with Keychain-backed auth session storage.
+- Session restore on app launch and logout are implemented.
+- API services use `AuthTokenProvider` to attach bearer tokens.
+
+### Remote services
+- `complete-onboarding` is called after onboarding completion.
+- Task analysis loop is connected (`analyze-task`, `answer-clarification`, `generate-reply`).
+- Task actions and read APIs are connected (`update-task-status`, `message-marked-sent`, task list/detail/read endpoints).
+- Reminder sync endpoints are connected (`reminder-create`, `reminder-update`, `reminder-cancel`, `reminder-snooze`, `get-reminders`).
+- Subscription sync endpoints are connected (`validate-subscription`, `restore-purchases`).
+
+### Subscription runtime
+- StoreKit 2 purchase/restore access flow is implemented in iOS.
+- Local StoreKit configuration exists for development testing.
+- Backend mirror mode currently supports `ios_verified_mirror` flow for MVP/TestFlight scaffolding.
+
+### Xcode configuration rules
+- Shared scheme must not contain concrete runtime env values.
+- Use a local unshared scheme for runtime values such as Supabase/Functions URLs and product ID.
+- Keep placeholder defaults only in shared project config.
+
+### Security boundaries
+- iOS never calls OpenAI directly.
+- iOS must never include Supabase `service_role` key.
+- OpenAI keys live only in Supabase backend secrets.
+
+### Still required before broader public release
+- Production deep links and email confirmation behavior may require final production setup.
+- Sign in with Apple may still be required before broader/public release.
+
+### Deferred / v1.1
+- Attachments/OCR are deferred (Coming soon).
+- Full Apple Server API validation is deferred.
+- App Store Server Notifications integration is deferred.
+- No autonomous external actions are supported.
