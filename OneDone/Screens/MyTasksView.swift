@@ -18,12 +18,26 @@ struct MyTasksView: View {
                     subtitle: "Follow-through hub for active work"
                 )
 
-                IllustrationCard(
-                    title: "Keep momentum",
-                    subtitle: "Prioritized by what needs your attention first.",
-                    variant: .focused,
-                    minHeight: 118
-                )
+                if filteredAndSortedTasks.isEmpty {
+                    IllustrationCard(
+                        title: "Keep momentum",
+                        subtitle: "Prioritized by what needs your attention first.",
+                        variant: .focused,
+                        minHeight: 118
+                    )
+                } else {
+                    ODCard(contentPadding: 14, style: .muted) {
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            Text("Keep momentum")
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
+                            Spacer(minLength: OneDoneStyle.space8)
+                            Text("\(filteredAndSortedTasks.count) in view")
+                                .font(OneDoneStyle.captionFont.weight(.semibold))
+                                .foregroundStyle(ODColor.textSecondary)
+                        }
+                    }
+                }
 
                 filterBar
 
@@ -121,7 +135,7 @@ struct MyTasksView: View {
                                     scheduleText: scheduleText(for: task),
                                     nextStepPreview: task.currentNextStep,
                                     lastEventPreview: task.lastEventPreview,
-                                    style: .default
+                                    style: .muted
                                 )
                             }
                             .buttonStyle(.plain)
@@ -154,7 +168,7 @@ struct MyTasksView: View {
     }
 
     private var filterBar: some View {
-        ODCard(contentPadding: 10, style: .muted) {
+        ODCard(contentPadding: 8, style: .muted) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: OneDoneStyle.tightSpacing) {
                     ForEach(MyTasksFilter.allCases) { filter in
@@ -168,10 +182,10 @@ struct MyTasksView: View {
                                     selectedFilter == filter ? ODColor.primaryContrast : ODColor.textPrimary
                                 )
                                 .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
+                                .padding(.vertical, 7)
                                 .background(
                                     Capsule(style: .continuous)
-                                        .fill(selectedFilter == filter ? ODColor.primary : ODColor.surfaceStrong)
+                                        .fill(selectedFilter == filter ? ODColor.primary : ODColor.glassFillSecondary)
                                 )
                                 .overlay(
                                     Capsule(style: .continuous)
