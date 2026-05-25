@@ -8,36 +8,53 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(title: "Settings", subtitle: "Prototype controls")
+                ODSectionHeader(title: "Settings", subtitle: "Account, preferences, and privacy")
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                        Text("Signed in account")
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        Text("Account")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        Text(appState.authenticatedUserEmail ?? "Not signed in")
-                            .font(OneDoneStyle.bodyFont)
-                            .foregroundStyle(ODColor.textSecondary)
+                        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .foregroundStyle(ODColor.primary)
+                                .padding(.top, 1)
+                            Text(appState.authenticatedUserEmail ?? "Not signed in")
+                                .font(OneDoneStyle.bodyFont)
+                                .foregroundStyle(ODColor.textSecondary)
+                                .textSelection(.enabled)
+                        }
 
                         if appState.services.runtimeMode == .remoteAccessState {
-                            ODSecondaryButton(
-                                title: isLoggingOut ? "Logging out..." : "Log out",
-                                icon: "rectangle.portrait.and.arrow.right",
-                                isDisabled: isLoggingOut
-                            ) {
-                                Task {
-                                    isLoggingOut = true
-                                    await appState.logOut()
-                                    isLoggingOut = false
+                            HStack {
+                                Spacer(minLength: 0)
+                                ODSecondaryButton(
+                                    title: isLoggingOut ? "Logging out..." : "Log out",
+                                    icon: "rectangle.portrait.and.arrow.right",
+                                    isDisabled: isLoggingOut,
+                                    fullWidth: false
+                                ) {
+                                    Task {
+                                        isLoggingOut = true
+                                        await appState.logOut()
+                                        isLoggingOut = false
+                                    }
                                 }
+                                .frame(maxWidth: 280)
+                                Spacer(minLength: 0)
                             }
+                            .padding(.top, OneDoneStyle.space4)
                         }
                     }
                 }
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        Text("Preferences")
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
+
                         Toggle("Reminders", isOn: $appState.remindersEnabled)
                         Toggle("Haptics", isOn: $appState.hapticsEnabled)
                         Toggle("Calm Mode", isOn: $appState.calmModeEnabled)
@@ -49,7 +66,7 @@ struct SettingsView: View {
 
                 ODCard {
                     VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                        Text("Current access")
+                        Text("Access")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
                         Text(appState.accessSummary)
@@ -58,40 +75,31 @@ struct SettingsView: View {
                     }
                 }
 
-                ODCard {
-                    ODInfoBanner(
-                        title: "Runtime mode",
-                        message: runtimeModeMessage,
-                        icon: "internaldrive.fill",
-                        tone: appState.services.runtimeMode == .remoteAccessState ? .success : .warning
-                    )
-                }
-
                 if let accessStatusNote = appState.accessStatusNote {
                     ODInfoBanner(
-                        title: "Access status",
+                        title: "Access update",
                         message: accessStatusNote,
                         icon: "info.circle.fill",
                         tone: .neutral
                     )
                 }
+
+#if DEBUG
+                if appState.services.runtimeMode == .mock {
+                    ODInfoBanner(
+                        title: "Development mode",
+                        message: "Mock mode is active for local previews and development only.",
+                        icon: "wrench.and.screwdriver.fill",
+                        tone: .warning
+                    )
+                }
+#endif
             }
             .padding(OneDoneStyle.screenPadding)
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
-    }
-
-    private var runtimeModeMessage: String {
-        switch appState.services.runtimeMode {
-        case .mock:
-            return "Running in local mock mode for previews/development fallback."
-        case .remoteAccessState:
-            return "Remote-first MVP runtime is active (Auth + access state + task APIs)."
-        case .remotePlaceholder:
-            return "Remote placeholder mode is scaffold-only and not intended for runtime."
-        }
     }
 }
 

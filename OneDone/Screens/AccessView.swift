@@ -5,16 +5,18 @@ struct AccessView: View {
     @Bindable var appState: AppState
     @State private var showGatePreview: Bool = false
 
+    private let actionMaxWidth: CGFloat = 340
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
                     title: "Access",
-                    subtitle: "Mock starter, trial, and subscription states"
+                    subtitle: "Your current plan and available actions"
                 )
 
                 ODCard {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         ODStatusBadge(
                             title: appState.mockAccessState.displayName,
                             tone: accessStatusTone
@@ -24,7 +26,7 @@ struct AccessView: View {
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
 
-                        Text(appState.canCreateNewTasks ? "Creation is unlocked in this state." : "Creation is locked in this state. Existing tasks remain viewable.")
+                        Text(accessDescription)
                             .font(OneDoneStyle.subheadlineFont)
                             .foregroundStyle(ODColor.textPrimary)
                     }
@@ -32,59 +34,80 @@ struct AccessView: View {
 
                 ODCard {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text("Mock access state")
+                        Text("What stays available")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        ForEach(APIAccessState.allCases) { state in
-                            Button {
-                                appState.setMockAccessState(state)
-                            } label: {
-                                HStack {
-                                    Text(state.displayName)
-                                        .font(OneDoneStyle.subheadlineFont.weight(.semibold))
-                                        .foregroundStyle(ODColor.textPrimary)
-                                    Spacer()
-                                    if appState.mockAccessState == state {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(ODColor.primary)
-                                    }
-                                }
-                                .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
-                                .padding(.vertical, OneDoneStyle.controlVerticalPadding)
-                                .background(
-                                    RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                        .fill(appState.mockAccessState == state ? ODColor.primarySoft : ODColor.surfaceStrong)
-                                )
-                            }
-                            .buttonStyle(.plain)
+                        accessAvailabilityRow("View existing tasks and task details")
+                        accessAvailabilityRow("Review previous outputs and reminders")
+
+                        if appState.canCreateNewTasks {
+                            accessAvailabilityRow("Create new tasks and generate new replies")
+                        } else {
+                            accessAvailabilityRow("New creation and generation actions are locked until access is active")
                         }
                     }
                 }
 
-                ODCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Gate preview")
-                            .font(OneDoneStyle.cardTitleFont)
-                            .foregroundStyle(ODColor.textPrimary)
+                if !appState.canCreateNewTasks {
+                    centeredAction {
+                        ODPrimaryButton(title: "Start 14-day trial", icon: "sparkles") {
+                            showGatePreview = true
+                        }
+                    }
 
-                        Text("Use this to test Starter and trial/subscription gate states without StoreKit.")
-                            .font(OneDoneStyle.bodyFont)
-                            .foregroundStyle(ODColor.textSecondary)
-
-                        ODPrimaryButton(
-                            title: "Open Subscription Gate",
-                            icon: "lock.fill",
-                            isDisabled: appState.canCreateNewTasks
-                        ) {
+                    centeredAction {
+                        ODSecondaryButton(title: "Restore Purchases", icon: "arrow.clockwise") {
                             showGatePreview = true
                         }
                     }
                 }
 
-                ODPrimaryButton(title: "Enter OneDone", icon: "arrow.right.circle") {
-                    appState.enterMainApp()
+                centeredAction {
+                    ODSecondaryButton(title: appState.canCreateNewTasks ? "Continue" : "Continue in limited mode", icon: "arrow.right") {
+                        appState.enterMainApp()
+                    }
                 }
+
+#if DEBUG
+                if appState.services.runtimeMode == .mock {
+                    ODCard(style: .muted) {
+                        VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                            Text("Developer preview controls")
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
+
+                            Text("Use local mock states for development and previews.")
+                                .font(OneDoneStyle.subheadlineFont)
+                                .foregroundStyle(ODColor.textSecondary)
+
+                            ForEach(APIAccessState.allCases) { state in
+                                Button {
+                                    appState.setMockAccessState(state)
+                                } label: {
+                                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                                        Text(state.displayName)
+                                            .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                                            .foregroundStyle(ODColor.textPrimary)
+                                        Spacer()
+                                        if appState.mockAccessState == state {
+                                            Image(systemName: "checkmark.circle.fill")
+                                                .foregroundStyle(ODColor.primary)
+                                        }
+                                    }
+                                    .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+                                    .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                            .fill(appState.mockAccessState == state ? ODColor.primarySoft : ODColor.surfaceStrong)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+#endif
             }
             .padding(OneDoneStyle.screenPadding)
         }
@@ -97,6 +120,34 @@ struct AccessView: View {
             }
         }
         .oneDoneScreen()
+    }
+
+    private var accessDescription: String {
+        appState.canCreateNewTasks
+            ? "Creation is available in your current state."
+            : "Creation is locked right now, but your existing tasks remain available."
+    }
+
+    private func accessAvailabilityRow(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ODColor.primary)
+                .padding(.top, 1)
+            Text(text)
+                .font(OneDoneStyle.subheadlineFont)
+                .foregroundStyle(ODColor.textSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func centeredAction<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack {
+            Spacer(minLength: 0)
+            content()
+                .frame(maxWidth: actionMaxWidth)
+            Spacer(minLength: 0)
+        }
     }
 
     private var accessStatusTone: ODStatusTone {
