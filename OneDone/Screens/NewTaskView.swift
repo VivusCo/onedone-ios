@@ -25,138 +25,13 @@ struct NewTaskView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: "New Task",
-                    subtitle: "Describe one task in plain text"
-                )
-
-                ODInfoBanner(
-                    title: "Text-first MVP",
-                    message: "Paste a message, bill text, or describe the task clearly. Attachments and OCR are not available yet.",
-                    icon: "text.alignleft",
-                    tone: .neutral
-                )
-
-                if let selectedTemplate {
-                    ODCard(style: .strong) {
-                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
-                            Text("Template")
-                                .font(OneDoneStyle.captionFont.weight(.semibold))
-                                .foregroundStyle(ODColor.primary)
-                            Text(selectedTemplate.title)
-                                .font(OneDoneStyle.cardTitleFont)
-                                .foregroundStyle(ODColor.textPrimary)
-                            Text(selectedTemplate.focus)
-                                .font(OneDoneStyle.subheadlineFont)
-                                .foregroundStyle(ODColor.textSecondary)
-                        }
-                    }
-                }
-
-                IllustrationCard(
-                    title: "Start with one clear task",
-                    subtitle: "The more specific your description, the better the next steps.",
-                    variant: .focused,
-                    minHeight: 118
-                )
-
-                ODCard {
-                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text("Task description")
-                            .font(OneDoneStyle.cardTitleFont)
-                            .foregroundStyle(ODColor.textPrimary)
-
-                        TextEditor(text: $prompt)
-                            .font(OneDoneStyle.bodyFont)
-                            .frame(minHeight: 220)
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                    .fill(ODColor.surface)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                    .stroke(ODColor.border, lineWidth: 1)
-                            )
-                            .overlay(alignment: .topLeading) {
-                                if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    Text("What do you need to deal with?")
-                                        .font(OneDoneStyle.bodyFont)
-                                        .foregroundStyle(ODColor.textTertiary)
-                                        .padding(.horizontal, 14)
-                                        .padding(.vertical, 16)
-                                }
-                            }
-
-                        HStack(spacing: OneDoneStyle.tightSpacing) {
-                            ODComingSoonBadge(text: "Attachments coming soon")
-
-                            Text("Paste text only in MVP")
-                                .font(OneDoneStyle.captionFont)
-                                .foregroundStyle(ODColor.textSecondary)
-                        }
-                    }
-                }
-
-                HStack {
-                    Spacer(minLength: 0)
-                    ODPrimaryButton(
-                        title: "Analyze Task",
-                        icon: "arrow.right",
-                        isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
-                    ) {
-                        guard appState.canCreateNewTasks else {
-                            showSubscriptionGate = true
-                            return
-                        }
-
-                        Task {
-                            await submitTaskAnalysis(retryLast: false)
-                        }
-                    }
-                    .frame(maxWidth: 360)
-                    Spacer(minLength: 0)
-                }
-
-                if isSubmitting {
-                    HStack(spacing: OneDoneStyle.tightSpacing) {
-                        ProgressView()
-                            .tint(ODColor.primary)
-                        Text("Analyzing task...")
-                            .font(OneDoneStyle.subheadlineFont)
-                            .foregroundStyle(ODColor.textSecondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if let submitErrorMessage {
-                    ODInfoBanner(
-                        title: "Could not analyze task",
-                        message: submitErrorMessage,
-                        icon: "exclamationmark.triangle.fill",
-                        tone: .warning
-                    )
-
-                    if lastSubmission != nil {
-                        ODSecondaryButton(title: "Retry analysis", icon: "arrow.clockwise") {
-                            Task {
-                                await submitTaskAnalysis(retryLast: true)
-                            }
-                        }
-                    }
-                }
-
-                if let splitPreviewMessage {
-                    ODInfoBanner(
-                        title: "Multiple tasks detected",
-                        message: splitPreviewMessage,
-                        icon: "list.bullet.rectangle",
-                        tone: .neutral
-                    )
-                }
+            if isSubmitting {
+                analyzingStateBlock
+                    .padding(OneDoneStyle.screenPadding)
+            } else {
+                composeTaskBlock
+                    .padding(OneDoneStyle.screenPadding)
             }
-            .padding(OneDoneStyle.screenPadding)
         }
         .navigationTitle("New Task")
         .navigationBarTitleDisplayMode(.inline)
@@ -184,6 +59,174 @@ struct NewTaskView: View {
                 TaskResultView(appState: appState, task: taskResult)
             }
         }
+    }
+
+    private var composeTaskBlock: some View {
+        VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
+            IllustrationCard(
+                title: "Text-first MVP",
+                subtitle: "Paste message, bill, or policy text. Attachments and OCR stay coming soon.",
+                variant: .focused,
+                minHeight: 126
+            )
+
+            ODCard(style: .default) {
+                VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                    Text("Task description")
+                        .font(OneDoneStyle.cardTitleFont)
+                        .foregroundStyle(ODColor.textPrimary)
+
+                    TextEditor(text: $prompt)
+                        .font(OneDoneStyle.bodyFont)
+                        .frame(minHeight: 240)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                                        .fill(ODColor.glassFillSecondary)
+                                )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
+                                .stroke(ODColor.glassBorder, lineWidth: 0.9)
+                        )
+                        .overlay(alignment: .topLeading) {
+                            if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                Text("What do you need to deal with?")
+                                    .font(OneDoneStyle.bodyFont)
+                                    .foregroundStyle(ODColor.textTertiary)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 18)
+                            }
+                        }
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: OneDoneStyle.tightSpacing) {
+                            if let selectedTemplate {
+                                metadataChip(title: selectedTemplate.title, tone: .highlight)
+                            }
+                            metadataChip(title: "Optional deadline")
+                            metadataChip(title: "Auto category")
+                        }
+                        .padding(.horizontal, 2)
+                    }
+
+                    HStack(spacing: OneDoneStyle.tightSpacing) {
+                        ODComingSoonBadge(text: "Attachments/OCR coming soon")
+                        Text("Paste text only in MVP")
+                            .font(OneDoneStyle.captionFont)
+                            .foregroundStyle(ODColor.textSecondary)
+                    }
+                }
+            }
+
+            HStack {
+                Spacer(minLength: 0)
+                ODPrimaryButton(
+                    title: "Analyze Task",
+                    icon: "arrow.right",
+                    isDisabled: prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting
+                ) {
+                    guard appState.canCreateNewTasks else {
+                        showSubscriptionGate = true
+                        return
+                    }
+
+                    Task {
+                        await submitTaskAnalysis(retryLast: false)
+                    }
+                }
+                .frame(maxWidth: 260)
+                Spacer(minLength: 0)
+            }
+
+            if let submitErrorMessage {
+                ODInfoBanner(
+                    title: "Could not analyze task",
+                    message: submitErrorMessage,
+                    icon: "exclamationmark.triangle.fill",
+                    tone: .warning
+                )
+
+                if lastSubmission != nil {
+                    HStack {
+                        Spacer(minLength: 0)
+                        ODSecondaryButton(title: "Retry analysis", icon: "arrow.clockwise") {
+                            Task {
+                                await submitTaskAnalysis(retryLast: true)
+                            }
+                        }
+                        .frame(maxWidth: 260)
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+
+            if let splitPreviewMessage {
+                ODInfoBanner(
+                    title: "Multiple tasks detected",
+                    message: splitPreviewMessage,
+                    icon: "list.bullet.rectangle",
+                    tone: .neutral
+                )
+            }
+        }
+    }
+
+    private var analyzingStateBlock: some View {
+        VStack(spacing: OneDoneStyle.sectionSpacing) {
+            Spacer(minLength: 50)
+
+            ZStack {
+                Circle()
+                    .fill(ODColor.accentPrimaryDeepGreen.opacity(0.20))
+                    .frame(width: 116, height: 116)
+                    .blur(radius: 14)
+
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .fill(ODColor.glassFillPrimary.opacity(0.8))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .stroke(ODColor.glassBorder, lineWidth: 0.9)
+                    )
+                    .frame(width: 112, height: 112)
+                    .shadow(color: ODColor.glassShadow.opacity(0.75), radius: 16, x: 0, y: 8)
+
+                Image(systemName: "sparkles")
+                    .font(.system(size: 36, weight: .semibold))
+                    .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+            }
+
+            VStack(spacing: OneDoneStyle.tightSpacing) {
+                Text("Finding the next step")
+                    .font(.system(size: 26, weight: .black, design: .rounded))
+                    .foregroundStyle(ODColor.textPrimary)
+                    .multilineTextAlignment(.center)
+
+                Text("If anything important is missing, OneDone will ask one clear question.")
+                    .font(OneDoneStyle.subheadlineFont)
+                    .foregroundStyle(ODColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 280)
+            }
+
+            ProgressView()
+                .tint(ODColor.accentPrimaryDeepGreen)
+                .padding(.top, OneDoneStyle.space4)
+
+            Spacer(minLength: 40)
+        }
+        .frame(maxWidth: .infinity, minHeight: 560)
+    }
+
+    private func metadataChip(title: String, tone: ODStatusTone = .neutral) -> some View {
+        ODStatusBadge(title: title, tone: tone)
     }
 
     @MainActor
