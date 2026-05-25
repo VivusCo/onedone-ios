@@ -10,41 +10,63 @@ struct AccessView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: "Access",
-                    subtitle: "Your current plan and available actions"
-                )
-
-                ODCard {
+                ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         ODStatusBadge(
-                            title: appState.mockAccessState.displayName,
+                            title: friendlyAccessLabel,
                             tone: accessStatusTone
                         )
+
+                        Text(accessHeadline)
+                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .foregroundStyle(ODColor.textPrimary)
+                            .lineLimit(3)
 
                         Text(appState.accessSummary)
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
-
-                        Text(accessDescription)
-                            .font(OneDoneStyle.subheadlineFont)
-                            .foregroundStyle(ODColor.textPrimary)
                     }
                 }
 
-                ODCard {
+                ODCard(style: .default) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
-                        Text("What stays available")
+                        Text("Current availability")
                             .font(OneDoneStyle.cardTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
-                        accessAvailabilityRow("View existing tasks and task details")
-                        accessAvailabilityRow("Review previous outputs and reminders")
+                        capabilityRow(
+                            title: "Saved tasks",
+                            value: "Available"
+                        )
+                        capabilityRow(
+                            title: "Saved outputs",
+                            value: "Available"
+                        )
+                        capabilityRow(
+                            title: "New task creation",
+                            value: appState.canCreateNewTasks ? "Available" : "Locked"
+                        )
+                        capabilityRow(
+                            title: "Draft replies",
+                            value: appState.canCreateNewTasks ? "Available" : "Locked"
+                        )
+                        capabilityRow(
+                            title: "Reminders",
+                            value: appState.canCreateNewTasks ? "Available" : "View only"
+                        )
+                    }
+                }
 
-                        if appState.canCreateNewTasks {
-                            accessAvailabilityRow("Create new tasks and generate new replies")
-                        } else {
-                            accessAvailabilityRow("New creation and generation actions are locked until access is active")
+                if !appState.canCreateNewTasks {
+                    ODCard(style: .muted) {
+                        VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
+                            Text("Still available")
+                                .font(OneDoneStyle.cardTitleFont)
+                                .foregroundStyle(ODColor.textPrimary)
+
+                            accessAvailabilityRow("View existing tasks and task details")
+                            accessAvailabilityRow("Review previous outputs and reminders")
+                            accessAvailabilityRow("Restore purchases")
                         }
                     }
                 }
@@ -122,10 +144,54 @@ struct AccessView: View {
         .oneDoneScreen()
     }
 
-    private var accessDescription: String {
-        appState.canCreateNewTasks
-            ? "Creation is available in your current state."
-            : "Creation is locked right now, but your existing tasks remain available."
+    private var friendlyAccessLabel: String {
+        switch appState.mockAccessState {
+        case .starter_active:
+            return "Starter active"
+        case .starter_expired:
+            return "Starter ended"
+        case .trial_not_started:
+            return "Trial required"
+        case .trial_active:
+            return "Trial active"
+        case .trial_expired:
+            return "Trial ended"
+        case .subscription_active:
+            return "Subscription active"
+        case .subscription_cancelled_active:
+            return "Subscription active"
+        case .subscription_expired:
+            return "Subscription ended"
+        case .grace_period:
+            return "Billing grace period"
+        case .billing_issue:
+            return "Billing issue"
+        case .onboarding_required:
+            return "Onboarding required"
+        case .unauthenticated:
+            return "Login required"
+        }
+    }
+
+    private var accessHeadline: String {
+        switch appState.mockAccessState {
+        case .starter_active:
+            return "3 days to try the full loop."
+        case .starter_expired, .trial_not_started:
+            return "Keep using OneDone."
+        case .trial_active, .subscription_active, .subscription_cancelled_active:
+            return "Access is active."
+        case .grace_period:
+            return "Access is active while billing is resolved."
+        case .billing_issue:
+            return "Creation is locked until billing is resolved."
+        case .trial_expired, .subscription_expired:
+            return "Creation is locked until access is renewed."
+        case .onboarding_required:
+            return "Finish onboarding to unlock Starter Access."
+        case .unauthenticated:
+            return "Sign in to continue."
+        }
     }
 
     private func accessAvailabilityRow(_ text: String) -> some View {
@@ -139,6 +205,26 @@ struct AccessView: View {
                 .foregroundStyle(ODColor.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func capabilityRow(title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: OneDoneStyle.tightSpacing) {
+            Text(title)
+                .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                .foregroundStyle(ODColor.textPrimary)
+
+            Spacer(minLength: OneDoneStyle.tightSpacing)
+
+            Text(value)
+                .font(OneDoneStyle.subheadlineFont)
+                .foregroundStyle(ODColor.textSecondary)
+                .lineLimit(1)
+        }
+        .padding(.vertical, OneDoneStyle.space4)
+        .overlay(alignment: .bottom) {
+            Divider()
+                .overlay(ODColor.glassBorder.opacity(0.65))
+        }
     }
 
     private func centeredAction<Content: View>(@ViewBuilder content: () -> Content) -> some View {
