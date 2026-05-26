@@ -3,9 +3,9 @@ import SwiftUI
 enum ODColor {
     // MARK: - Base Canvas (warm / calm)
     static let backgroundWarm = Color(red: 0.978, green: 0.974, blue: 0.960)
-    static let backgroundAccentRadialA = Color(red: 0.14, green: 0.44, blue: 0.37).opacity(0.22)
-    static let backgroundAccentRadialB = Color(red: 0.93, green: 0.69, blue: 0.46).opacity(0.20)
-    static let backgroundAccentRadialC = Color(red: 1.00, green: 0.98, blue: 0.95).opacity(0.22)
+    static let backgroundAccentRadialA = Color(red: 0.14, green: 0.44, blue: 0.37).opacity(0.30)
+    static let backgroundAccentRadialB = Color(red: 0.93, green: 0.69, blue: 0.46).opacity(0.27)
+    static let backgroundAccentRadialC = Color(red: 1.00, green: 0.98, blue: 0.95).opacity(0.18)
 
     // MARK: - Glass Surfaces
     static let glassFillPrimary = Color(red: 1.00, green: 0.99, blue: 0.97).opacity(0.56)
@@ -54,9 +54,9 @@ struct ODWarmRadialBackground: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.34),
-                    Color.white.opacity(0.15),
-                    Color.white.opacity(0.04)
+                    Color.white.opacity(0.22),
+                    Color.white.opacity(0.08),
+                    Color.white.opacity(0.02)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -67,7 +67,7 @@ struct ODWarmRadialBackground: View {
                 colors: [ODColor.backgroundAccentRadialA, .clear],
                 center: UnitPoint(x: 0.12, y: 0.08),
                 startRadius: 8,
-                endRadius: 380
+                endRadius: 420
             )
             .blendMode(.normal)
 
@@ -75,7 +75,7 @@ struct ODWarmRadialBackground: View {
                 colors: [ODColor.backgroundAccentRadialB, .clear],
                 center: UnitPoint(x: 0.88, y: 0.12),
                 startRadius: 10,
-                endRadius: 360
+                endRadius: 395
             )
             .blendMode(.normal)
 
