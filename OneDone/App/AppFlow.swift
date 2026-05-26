@@ -66,6 +66,15 @@ private struct MainTabShell: View {
     @Bindable var appState: AppState
     @State private var showTaskComposer: Bool = false
 
+    private enum ShellLayout {
+        static let barHeight: CGFloat = 68
+        static let insetHeight: CGFloat = 94
+        static let barTopInset: CGFloat = 10
+        static let barHorizontalPadding: CGFloat = 10
+        static let contentBottomClearance: CGFloat = 98
+        static let barBottomPadding: CGFloat = 4
+    }
+
     var body: some View {
         TabView(selection: $appState.selectedTab) {
             NavigationStack {
@@ -102,6 +111,9 @@ private struct MainTabShell: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: ShellLayout.contentBottomClearance)
+        }
+        .overlay(alignment: .bottom) {
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .fill(.ultraThinMaterial)
@@ -114,7 +126,8 @@ private struct MainTabShell: View {
                             .stroke(ODColor.glassBorder.opacity(0.90), lineWidth: 0.9)
                     )
                     .shadow(color: Color.black.opacity(0.12), radius: 18, x: 0, y: 10)
-                    .frame(height: 72)
+                    .frame(height: ShellLayout.barHeight)
+                    .padding(.top, ShellLayout.barTopInset)
 
                 HStack(spacing: 0) {
                     tabItem(for: .home)
@@ -126,8 +139,8 @@ private struct MainTabShell: View {
                     tabItem(for: .templates)
                     tabItem(for: .settings)
                 }
-                .padding(.horizontal, 8)
-                .padding(.top, 9)
+                .padding(.horizontal, ShellLayout.barHorizontalPadding)
+                .padding(.top, ShellLayout.barTopInset + 9)
 
                 ElevatedTaskTabButton(
                     title: "Task",
@@ -135,16 +148,13 @@ private struct MainTabShell: View {
                 ) {
                     showTaskComposer = true
                 }
-                .offset(y: -28)
             }
+            .frame(height: ShellLayout.insetHeight)
             .padding(.horizontal, OneDoneStyle.space20)
-            .padding(.top, 8)
-            .padding(.bottom, 8)
+            .padding(.bottom, ShellLayout.barBottomPadding)
         }
         .sheet(isPresented: $showTaskComposer) {
-            NavigationStack {
-                NewTaskView(appState: appState, prefilledPrompt: nil)
-            }
+            TaskComposerSheet(appState: appState)
         }
         .onAppear {
             // iOS 17+ can still render the native TabView bar in some layouts even when hidden via toolbar APIs.
@@ -187,6 +197,38 @@ private struct MainTabShell: View {
             return "Tasks"
         case .settings:
             return "Settings"
+        }
+    }
+}
+
+private struct TaskComposerSheet: View {
+    @Bindable var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            NewTaskView(appState: appState, prefilledPrompt: nil)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(ODColor.textSecondary)
+                                .padding(8)
+                                .background(
+                                    Circle()
+                                        .fill(ODColor.glassFillSecondary)
+                                )
+                                .overlay(
+                                    Circle()
+                                        .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.9)
+                                )
+                        }
+                        .accessibilityLabel("Close")
+                    }
+                }
         }
     }
 }

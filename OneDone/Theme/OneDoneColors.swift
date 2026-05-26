@@ -2,10 +2,10 @@ import SwiftUI
 
 enum ODColor {
     // MARK: - Base Canvas (warm / calm)
-    static let backgroundWarm = Color(red: 0.969, green: 0.973, blue: 0.945)
-    static let backgroundAccentRadialA = Color(red: 0.09, green: 0.42, blue: 0.36).opacity(0.11)
-    static let backgroundAccentRadialB = Color(red: 0.91, green: 0.58, blue: 0.36).opacity(0.10)
-    static let backgroundAccentRadialC = Color.white.opacity(0.16)
+    static let backgroundWarm = Color(red: 0.976, green: 0.972, blue: 0.956)
+    static let backgroundAccentRadialA = Color(red: 0.14, green: 0.44, blue: 0.37).opacity(0.11)
+    static let backgroundAccentRadialB = Color(red: 0.93, green: 0.69, blue: 0.46).opacity(0.10)
+    static let backgroundAccentRadialC = Color.white.opacity(0.20)
 
     // MARK: - Glass Surfaces
     static let glassFillPrimary = Color.white.opacity(0.50)
@@ -54,9 +54,9 @@ struct ODWarmRadialBackground: View {
 
             LinearGradient(
                 colors: [
-                    Color.white.opacity(0.84),
-                    Color.white.opacity(0.54),
-                    Color.white.opacity(0.22)
+                    Color.white.opacity(0.70),
+                    Color.white.opacity(0.42),
+                    Color.white.opacity(0.14)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
@@ -65,17 +65,17 @@ struct ODWarmRadialBackground: View {
 
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialA, .clear],
-                center: .topLeading,
-                startRadius: 12,
+                center: UnitPoint(x: 0.08, y: 0.05),
+                startRadius: 10,
                 endRadius: 300
             )
             .blendMode(.normal)
 
             RadialGradient(
                 colors: [ODColor.backgroundAccentRadialB, .clear],
-                center: .topTrailing,
+                center: UnitPoint(x: 0.90, y: 0.08),
                 startRadius: 16,
-                endRadius: 320
+                endRadius: 290
             )
             .blendMode(.normal)
 
