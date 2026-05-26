@@ -93,6 +93,48 @@ struct SettingsView: View {
                     }
                 }
 
+                ODCard(style: .default) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        Text("Privacy & Legal")
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
+
+                        settingsStaticRow(
+                            icon: "doc.text.fill",
+                            title: "Terms of Use",
+                            detail: "Available from the subscription screen in this MVP prototype."
+                        )
+
+                        settingsStaticRow(
+                            icon: "hand.raised.fill",
+                            title: "Privacy Policy",
+                            detail: "Available from the subscription screen in this MVP prototype."
+                        )
+                    }
+                }
+
+                ODCard(style: .muted) {
+                    VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
+                        Text("Data & Account")
+                            .font(OneDoneStyle.cardTitleFont)
+                            .foregroundStyle(ODColor.textPrimary)
+
+                        settingsStaticRow(
+                            icon: "person.crop.circle.badge.xmark",
+                            title: "Delete account",
+                            detail: "Contact support (coming soon).",
+                            isDestructive: true
+                        )
+
+                        settingsStaticRow(
+                            icon: "trash.fill",
+                            title: "Delete all data",
+                            detail: "Contact support (coming soon).",
+                            isDestructive: true
+                        )
+                    }
+                }
+
                 if let accessStatusNote = appState.accessStatusNote {
                     ODInfoBanner(
                         title: "Access update",
@@ -162,6 +204,43 @@ struct SettingsView: View {
 
             Toggle(title, isOn: isOn)
                 .toggleStyle(.switch)
+        }
+        .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
+        .padding(.vertical, OneDoneStyle.controlVerticalPadding)
+        .background(
+            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                .fill(ODColor.glassFillSecondary)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                .stroke(ODColor.glassBorder, lineWidth: 0.9)
+        )
+    }
+
+    private func settingsStaticRow(
+        icon: String,
+        title: String,
+        detail: String,
+        isDestructive: Bool = false
+    ) -> some View {
+        HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isDestructive ? ODColor.textSecondary : ODColor.accentPrimaryDeepGreen)
+                .frame(width: 18, height: 18)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: OneDoneStyle.space4) {
+                Text(title)
+                    .font(OneDoneStyle.subheadlineFont.weight(.semibold))
+                    .foregroundStyle(ODColor.textPrimary)
+
+                Text(detail)
+                    .font(OneDoneStyle.captionFont)
+                    .foregroundStyle(ODColor.textSecondary)
+            }
+
+            Spacer(minLength: 0)
         }
         .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
         .padding(.vertical, OneDoneStyle.controlVerticalPadding)
