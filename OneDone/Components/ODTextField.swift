@@ -17,11 +17,15 @@ struct ODTextField: View {
                 .padding(.vertical, OneDoneStyle.controlVerticalPadding)
                 .background(
                     RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                        .fill(ODColor.surface)
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                .fill(ODColor.glassFillSecondary)
+                        )
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                        .stroke(ODColor.border, lineWidth: 1)
+                        .stroke(ODColor.glassBorder.opacity(0.92), lineWidth: 0.9)
                 )
         }
     }

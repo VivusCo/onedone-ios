@@ -134,14 +134,14 @@ final class AppState {
     var hasViewedStarterIntro: Bool = false
     let onboardingPages: [OnboardingPage] = [
         OnboardingPage(
-            title: "OneDone keeps it simple",
+            title: "One task at a time",
             subtitle: "Guided self-service",
             body: "You bring a real task. OneDone helps you clarify it, draft a reply, and finish with calm momentum."
         ),
         OnboardingPage(
-            title: "Text-first MVP",
-            subtitle: "No noisy setup",
-            body: "Start with plain text prompts and focused guidance. Attachments are intentionally disabled while we keep the core flow clean."
+            title: "Start with text",
+            subtitle: "Simple input",
+            body: "Paste your message, bill, or policy text to get guided steps. Attachment uploads are not available yet."
         ),
         OnboardingPage(
             title: "Progress in small steps",
@@ -1153,7 +1153,7 @@ final class AppState {
                 services.reminderService.cancelReminder(identifier: previousID)
             }
 
-            var backendSyncWarning: String?
+            var didSyncFail = false
 
             if shouldUseRemoteTaskActions,
                let backendTaskID = existingTask.backendTaskID,
@@ -1186,7 +1186,7 @@ final class AppState {
                         }
                     }
                 } catch {
-                    backendSyncWarning = friendlyRemoteErrorMessage(error)
+                    didSyncFail = true
                 }
             }
 
@@ -1203,10 +1203,10 @@ final class AppState {
                 )
             }
 
-            if let backendSyncWarning {
+            if didSyncFail {
                 return ReminderActionFeedback(
                     kind: .warning,
-                    message: "Reminder set for \(friendlyDateTime(safeDate)) on this device, but backend sync failed. \(backendSyncWarning)"
+                    message: "Reminder set for \(friendlyDateTime(safeDate)) on this device. We couldn't sync it yet, but you can keep going and try again later."
                 )
             }
 
@@ -1238,7 +1238,7 @@ final class AppState {
             services.reminderService.cancelReminder(identifier: reminderID)
         }
 
-        var backendSyncWarning: String?
+        var didSyncFail = false
         if shouldUseRemoteTaskActions,
            existingTask.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
             if let backendReminderID = existingTask.backendReminderID, !backendReminderID.isEmpty {
@@ -1250,10 +1250,10 @@ final class AppState {
                         )
                     )
                 } catch {
-                    backendSyncWarning = friendlyRemoteErrorMessage(error)
+                    didSyncFail = true
                 }
             } else {
-                backendSyncWarning = "Backend reminder ID is missing, so remote cancel could not be synced."
+                didSyncFail = true
             }
         }
 
@@ -1271,10 +1271,10 @@ final class AppState {
             )
         }
 
-        if let backendSyncWarning {
+        if didSyncFail {
             return ReminderActionFeedback(
                 kind: .warning,
-                message: "Reminder canceled on this device, but backend sync failed. \(backendSyncWarning)"
+                message: "Reminder canceled on this device. We couldn't sync this change yet, but you can keep going and try again later."
             )
         }
 
@@ -1302,7 +1302,7 @@ final class AppState {
                 services.reminderService.cancelReminder(identifier: previousID)
             }
 
-            var backendSyncWarning: String?
+            var didSyncFail = false
             if shouldUseRemoteTaskActions,
                existingTask.backendTaskID?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
                 if let backendReminderID = existingTask.backendReminderID, !backendReminderID.isEmpty {
@@ -1323,10 +1323,10 @@ final class AppState {
                             }
                         }
                     } catch {
-                        backendSyncWarning = friendlyRemoteErrorMessage(error)
+                        didSyncFail = true
                     }
                 } else {
-                    backendSyncWarning = "Backend reminder ID is missing, so remote snooze could not be synced."
+                    didSyncFail = true
                 }
             }
 
@@ -1343,10 +1343,10 @@ final class AppState {
                 )
             }
 
-            if let backendSyncWarning {
+            if didSyncFail {
                 return ReminderActionFeedback(
                     kind: .warning,
-                    message: "Reminder snoozed on this device, but backend sync failed. \(backendSyncWarning)"
+                    message: "Reminder snoozed on this device. We couldn't sync this change yet, but you can keep going and try again later."
                 )
             }
 

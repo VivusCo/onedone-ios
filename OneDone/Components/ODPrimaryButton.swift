@@ -25,7 +25,7 @@ struct ODPrimaryButton: View {
             .padding(.horizontal, fullWidth ? 0 : 14)
             .background(buttonBackground)
             .clipShape(RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous))
-            .shadow(color: isDisabled ? .clear : ODColor.glassShadow.opacity(0.9), radius: 10, x: 0, y: 6)
+            .shadow(color: isDisabled ? .clear : ODColor.glassShadow.opacity(0.85), radius: 9, x: 0, y: 5)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
@@ -45,7 +45,7 @@ struct ODPrimaryButton: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(isDisabled ? 0.0 : 0.22), lineWidth: 0.75)
+                    .stroke(Color.white.opacity(isDisabled ? 0.0 : 0.28), lineWidth: 0.8)
             )
     }
 }

@@ -62,22 +62,26 @@ struct GlassCard<Content: View>: View {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(style.tint)
                     )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(0.08))
+                    )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(style.borderColor, lineWidth: OneDoneStyle.glassBorderWidth)
+                    .stroke(style.borderColor.opacity(0.9), lineWidth: OneDoneStyle.glassBorderWidth)
             )
             .overlay(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(OneDoneStyle.glassHighlightOpacity), lineWidth: 0.5)
+                    .stroke(Color.white.opacity(OneDoneStyle.glassHighlightOpacity * 0.72), lineWidth: 0.55)
                     .padding(0.5)
                     .blendMode(.screen)
             }
             .shadow(
                 color: includeShadow ? ODColor.glassShadow : .clear,
-                radius: OneDoneStyle.glassShadowRadius,
+                radius: OneDoneStyle.glassShadowRadius * 0.8,
                 x: 0,
-                y: OneDoneStyle.glassShadowYOffset
+                y: OneDoneStyle.glassShadowYOffset * 0.8
             )
     }
 }

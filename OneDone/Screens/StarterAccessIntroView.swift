@@ -6,36 +6,63 @@ struct StarterAccessIntroView: View {
 
     var body: some View {
         VStack(spacing: OneDoneStyle.sectionSpacing) {
-            ODSectionHeader(title: "Starter Access", subtitle: "Your first 3 days")
+            ODSectionHeader(
+                title: "Your first 3 days are open",
+                subtitle: "Starter Access"
+            )
 
-            ODCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("Your first 3 days are open.")
-                        .font(OneDoneStyle.cardTitleFont)
-                        .foregroundStyle(ODColor.primary)
+            IllustrationCard(
+                title: "Starter Access",
+                subtitle: "Create tasks, draft replies, and set reminders with calm guidance.",
+                variant: .focused,
+                minHeight: 132
+            )
 
-                    Text("Try OneDone with real tasks. After 3 days, start your 14-day App Store trial to keep going.")
-                        .font(OneDoneStyle.bodyFont)
-                        .foregroundStyle(ODColor.textSecondary)
+            ODCard(style: .strong) {
+                VStack(alignment: .leading, spacing: OneDoneStyle.space12) {
+                    Text("What you can do now")
+                        .font(OneDoneStyle.cardHeadlineFont)
+                        .foregroundStyle(ODColor.textPrimary)
+
+                    featureRow("Create and organize admin tasks")
+                    featureRow("Generate clear reply drafts")
+                    featureRow("Set follow-up reminders")
 
                     if showMockNotice {
                         ODInfoBanner(
-                            title: "Mock prototype",
-                            message: "This version uses local mock state only.",
+                            title: "Preview data enabled",
+                            message: "Sample tasks are shown in this session.",
                             icon: "checkmark.shield"
                         )
                     }
                 }
             }
 
-            ODPrimaryButton(title: "Start using OneDone", icon: "arrow.right") {
-                onContinue()
+            HStack {
+                Spacer(minLength: 0)
+                ODPrimaryButton(title: "Start using OneDone", icon: "arrow.right", fullWidth: false) {
+                    onContinue()
+                }
+                .frame(maxWidth: 260)
+                Spacer(minLength: 0)
             }
 
             Spacer()
         }
         .padding(OneDoneStyle.screenPadding)
         .oneDoneScreen()
+    }
+
+    private func featureRow(_ text: String) -> some View {
+        HStack(spacing: OneDoneStyle.space8) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+
+            Text(text)
+                .font(OneDoneStyle.subheadlineFont)
+                .foregroundStyle(ODColor.textSecondary)
+        }
     }
 }
 

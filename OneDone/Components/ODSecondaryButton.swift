@@ -36,11 +36,11 @@ struct ODSecondaryButton: View {
             .fill(.ultraThinMaterial)
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .fill(ODColor.glassFillSecondary)
+                    .fill(ODColor.glassFillSecondary.opacity(0.95))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .stroke(isDisabled ? ODColor.border.opacity(0.6) : ODColor.glassBorder, lineWidth: 1)
+                    .stroke(isDisabled ? ODColor.border.opacity(0.52) : ODColor.glassBorder.opacity(0.92), lineWidth: 0.9)
             )
     }
 }
