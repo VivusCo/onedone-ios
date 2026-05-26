@@ -154,6 +154,9 @@ struct SettingsView: View {
                     )
                 }
 #endif
+
+                Color.clear
+                    .frame(height: OneDoneStyle.tabRootContentBottomClearance)
             }
             .padding(OneDoneStyle.screenPadding)
         }

@@ -35,6 +35,9 @@ struct TemplatesView: View {
                         }
                     }
                 }
+
+                Color.clear
+                    .frame(height: OneDoneStyle.tabRootContentBottomClearance)
             }
             .padding(OneDoneStyle.screenPadding)
         }

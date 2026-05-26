@@ -83,6 +83,9 @@ struct HomeView: View {
                         }
                     }
                 }
+
+                Color.clear
+                    .frame(height: OneDoneStyle.tabRootContentBottomClearance)
             }
             .padding(OneDoneStyle.screenPadding)
         }

@@ -17,6 +17,8 @@ enum OneDoneStyle {
     static let contentSpacing: CGFloat = space10
     static let tightSpacing: CGFloat = space8
     static let relaxedSpacing: CGFloat = space20
+    // Extra scroll runway for root tab screens so final content can lift above the custom bottom nav.
+    static let tabRootContentBottomClearance: CGFloat = 72
 
     // MARK: - Radius
     static let radius8: CGFloat = 8
