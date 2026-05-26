@@ -8,22 +8,22 @@ struct ElevatedTaskTabButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
+            VStack(spacing: 1) {
                 ZStack {
                     Circle()
                         .fill(.ultraThinMaterial)
-                        .frame(width: 64, height: 64)
+                        .frame(width: 62, height: 62)
                         .overlay(
                             Circle()
-                                .fill(ODColor.backgroundWarm.opacity(0.98))
+                                .fill(ODColor.backgroundWarm.opacity(0.99))
                         )
                         .overlay(
                             Circle()
-                                .stroke(ODColor.glassBorder.opacity(0.95), lineWidth: 0.9)
+                                .stroke(ODColor.glassBorder.opacity(0.88), lineWidth: 0.9)
                         )
                         .overlay(
                             Circle()
-                                .stroke(ODColor.backgroundWarm.opacity(0.98), lineWidth: 4.5)
+                                .stroke(ODColor.backgroundWarm.opacity(0.99), lineWidth: 4.2)
                         )
 
                     Circle()
@@ -37,7 +37,7 @@ struct ElevatedTaskTabButton: View {
                                 endPoint: .bottom
                             )
                         )
-                        .frame(width: 52, height: 52)
+                        .frame(width: 50, height: 50)
                         .overlay(
                             Circle()
                                 .stroke(Color.white.opacity(0.28), lineWidth: 0.9)
@@ -53,18 +53,19 @@ struct ElevatedTaskTabButton: View {
                         .shadow(color: ODColor.accentPrimaryDeepGreen.opacity(0.22), radius: 4, x: 0, y: 3)
 
                     Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .regular))
+                        .font(.system(size: 21, weight: .regular))
                         .foregroundStyle(ODColor.accentPrimaryContrast)
-                        .offset(y: -0.5)
+                        .offset(y: -0.3)
                 }
 
                 Text(title)
                     .font(.system(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(ODColor.accentPrimaryDeepGreen)
                     .lineLimit(1)
+                    .offset(y: -7)
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 0)
+            .padding(.vertical, 1)
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)

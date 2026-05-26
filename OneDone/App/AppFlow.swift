@@ -68,10 +68,11 @@ private struct MainTabShell: View {
 
     private enum ShellLayout {
         static let barHeight: CGFloat = 62
-        static let insetHeight: CGFloat = 84
+        static let insetHeight: CGFloat = 82
         static let barTopInset: CGFloat = 6
         static let barHorizontalPadding: CGFloat = 10
         static let barBottomPadding: CGFloat = 2
+        static let centerButtonTopOffset: CGFloat = -5
     }
 
     var body: some View {
@@ -144,6 +145,7 @@ private struct MainTabShell: View {
                 ) {
                     showTaskComposer = true
                 }
+                .offset(y: ShellLayout.centerButtonTopOffset)
             }
             .frame(height: ShellLayout.insetHeight)
             .padding(.horizontal, OneDoneStyle.space20)

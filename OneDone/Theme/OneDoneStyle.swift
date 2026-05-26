@@ -47,6 +47,11 @@ enum OneDoneStyle {
     static let glassHighlightOpacity: CGFloat = 0.25
 
     // MARK: - Typography
+    static let screenTitleFont = Font.system(size: 34, weight: .black, design: .rounded)
+    static let heroTitleFont = Font.system(size: 38, weight: .bold, design: .rounded)
+    static let cardHeadlineFont = Font.system(.headline, design: .rounded).weight(.semibold)
+    static let sectionLabelFont = Font.system(.caption, design: .rounded).weight(.semibold)
+    static let helperFont = Font.system(.subheadline, design: .rounded)
     static let heroFont = Font.system(size: 38, weight: .bold, design: .rounded)
     static let sectionTitleFont = Font.system(.title2, design: .rounded).weight(.semibold)
     static let cardTitleFont = Font.system(.headline, design: .rounded)
