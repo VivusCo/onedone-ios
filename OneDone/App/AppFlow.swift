@@ -71,7 +71,6 @@ private struct MainTabShell: View {
         static let insetHeight: CGFloat = 94
         static let barTopInset: CGFloat = 10
         static let barHorizontalPadding: CGFloat = 10
-        static let contentBottomClearance: CGFloat = 98
         static let barBottomPadding: CGFloat = 4
     }
 
@@ -111,9 +110,6 @@ private struct MainTabShell: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: ShellLayout.contentBottomClearance)
-        }
-        .overlay(alignment: .bottom) {
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
                     .fill(.ultraThinMaterial)
