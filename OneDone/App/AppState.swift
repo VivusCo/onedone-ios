@@ -134,14 +134,14 @@ final class AppState {
     var hasViewedStarterIntro: Bool = false
     let onboardingPages: [OnboardingPage] = [
         OnboardingPage(
-            title: "OneDone keeps it simple",
+            title: "One task at a time",
             subtitle: "Guided self-service",
             body: "You bring a real task. OneDone helps you clarify it, draft a reply, and finish with calm momentum."
         ),
         OnboardingPage(
-            title: "Text-first MVP",
-            subtitle: "No noisy setup",
-            body: "Start with plain text prompts and focused guidance. Attachments are intentionally disabled while we keep the core flow clean."
+            title: "Start with text",
+            subtitle: "Simple input",
+            body: "Paste your message, bill, or policy text to get guided steps. Attachment uploads are not available yet."
         ),
         OnboardingPage(
             title: "Progress in small steps",

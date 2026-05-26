@@ -6,6 +6,12 @@ struct AuthView: View {
 
     @State private var email: String = ""
     @State private var password: String = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field {
+        case email
+        case password
+    }
 
     var body: some View {
         ScrollView {
@@ -15,13 +21,23 @@ struct AuthView: View {
                     subtitle: "Sign up or log in to continue"
                 )
 
-                ODCard {
+                IllustrationCard(
+                    title: "Life admin, less messy",
+                    subtitle: "Turn everyday admin tasks into clear steps.",
+                    variant: .optimistic,
+                    minHeight: 132
+                )
+
+                ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         ODTextField(
                             label: "Email",
                             placeholder: "you@example.com",
                             text: $email
                         )
+                        .focused($focusedField, equals: .email)
+                        .submitLabel(.next)
+                        .onSubmit { focusedField = .password }
                         .textInputAutocapitalization(.never)
                         .keyboardType(.emailAddress)
                         .autocorrectionDisabled(true)
@@ -33,15 +49,21 @@ struct AuthView: View {
 
                             SecureField("Password", text: $password)
                                 .textFieldStyle(.plain)
+                                .focused($focusedField, equals: .password)
+                                .submitLabel(.go)
                                 .padding(.horizontal, OneDoneStyle.controlHorizontalPadding)
                                 .padding(.vertical, OneDoneStyle.controlVerticalPadding)
                                 .background(
                                     RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                        .fill(ODColor.surface)
+                                        .fill(.ultraThinMaterial)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                                .fill(ODColor.glassFillSecondary)
+                                        )
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                        .stroke(ODColor.border, lineWidth: 1)
+                                        .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.9)
                                 )
                         }
                     }
@@ -72,8 +94,8 @@ struct AuthView: View {
                         ProgressView()
                             .tint(ODColor.primary)
 
-                        Text("Contacting secure auth...")
-                            .font(OneDoneStyle.subheadlineFont)
+                        Text("Securing your session...")
+                            .font(OneDoneStyle.helperFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
@@ -96,11 +118,19 @@ struct AuthView: View {
                     )
                 }
 
-                Spacer(minLength: 12)
+                Text("A guided self-service assistant. No autonomous actions.")
+                    .font(OneDoneStyle.captionFont)
+                    .foregroundStyle(ODColor.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, OneDoneStyle.space8)
+
+                Spacer(minLength: OneDoneStyle.space12)
             }
             .padding(OneDoneStyle.screenPadding)
         }
         .oneDoneScreen()
+        .scrollDismissesKeyboard(.interactively)
         .onAppear {
             if let knownEmail = appState.authenticatedUserEmail, email.isEmpty {
                 email = knownEmail

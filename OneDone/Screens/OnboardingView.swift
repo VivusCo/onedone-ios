@@ -13,21 +13,34 @@ struct OnboardingView: View {
 
     var body: some View {
         VStack(spacing: OneDoneStyle.sectionSpacing) {
-            ODSectionHeader(title: "Onboarding", subtitle: progressText)
+            ODSectionHeader(
+                title: "Let's keep it simple",
+                subtitle: progressText
+            )
 
-            ODCard {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text(page.subtitle.uppercased())
-                        .font(OneDoneStyle.captionFont.weight(.semibold))
-                        .foregroundStyle(ODColor.primary)
+            ODCard(style: .strong) {
+                VStack(alignment: .leading, spacing: OneDoneStyle.space12) {
+                    HStack(spacing: OneDoneStyle.space8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+
+                        Text(page.subtitle)
+                            .font(OneDoneStyle.sectionLabelFont)
+                            .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+                    }
 
                     Text(page.title)
-                        .font(.system(.title3, design: .rounded).weight(.semibold))
+                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                         .foregroundStyle(ODColor.textPrimary)
 
                     Text(page.body)
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
+                        .lineSpacing(2)
                 }
             }
 
@@ -38,13 +51,14 @@ struct OnboardingView: View {
                         .frame(width: 7, height: 7)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
 
             HStack(spacing: OneDoneStyle.contentSpacing) {
                 if canGoBack {
                     ODSecondaryButton(title: "Back", icon: "chevron.left", isDisabled: isSubmitting, fullWidth: false) {
                         onBack()
                     }
+                    .frame(width: 120)
                 }
 
                 ODPrimaryButton(
@@ -61,7 +75,7 @@ struct OnboardingView: View {
                     ProgressView()
                         .tint(ODColor.primary)
                     Text("Completing onboarding...")
-                        .font(OneDoneStyle.subheadlineFont)
+                        .font(OneDoneStyle.helperFont)
                         .foregroundStyle(ODColor.textSecondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -85,7 +99,7 @@ struct OnboardingView: View {
 
 #Preview {
     OnboardingView(
-        page: OnboardingPage(title: "OneDone keeps it simple", subtitle: "Guided self-service", body: "Focus on one real task at a time."),
+        page: OnboardingPage(title: "One task at a time", subtitle: "Guided self-service", body: "Focus on one real task at a time."),
         progressText: "Step 1 of 3",
         currentStep: 0,
         totalSteps: 3,
