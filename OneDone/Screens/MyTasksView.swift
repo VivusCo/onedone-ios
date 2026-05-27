@@ -14,8 +14,8 @@ struct MyTasksView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
-                    title: "My Tasks",
-                    subtitle: "Follow-through hub for active work"
+                    title: "Follow-through hub",
+                    subtitle: "Track active work and what needs attention"
                 )
 
                 if filteredAndSortedTasks.isEmpty {

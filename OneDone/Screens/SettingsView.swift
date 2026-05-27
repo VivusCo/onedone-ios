@@ -8,7 +8,7 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(title: "Settings", subtitle: "Account, access, preferences, and privacy")
+                ODSectionHeader(title: "Account & preferences", subtitle: "Access, privacy, and controls")
 
                 ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
@@ -102,13 +102,13 @@ struct SettingsView: View {
                         settingsStaticRow(
                             icon: "doc.text.fill",
                             title: "Terms of Use",
-                            detail: "Available from the subscription screen in this MVP prototype."
+                            detail: "Available from the subscription screen."
                         )
 
                         settingsStaticRow(
                             icon: "hand.raised.fill",
                             title: "Privacy Policy",
-                            detail: "Available from the subscription screen in this MVP prototype."
+                            detail: "Available from the subscription screen."
                         )
                     }
                 }
@@ -122,14 +122,14 @@ struct SettingsView: View {
                         settingsStaticRow(
                             icon: "person.crop.circle.badge.xmark",
                             title: "Delete account",
-                            detail: "Contact support (coming soon).",
+                            detail: "Contact support for this request.",
                             isDestructive: true
                         )
 
                         settingsStaticRow(
                             icon: "trash.fill",
                             title: "Delete all data",
-                            detail: "Contact support (coming soon).",
+                            detail: "Contact support for this request.",
                             isDestructive: true
                         )
                     }
@@ -148,7 +148,7 @@ struct SettingsView: View {
                 if appState.services.runtimeMode == .mock {
                     ODInfoBanner(
                         title: "Development mode",
-                        message: "Mock mode is active for local previews and development only.",
+                        message: "Preview data is active for this development build.",
                         icon: "wrench.and.screwdriver.fill",
                         tone: .warning
                     )

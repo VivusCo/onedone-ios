@@ -290,7 +290,7 @@ struct SubscriptionGateView: View {
             Button {
                 linkFeedback = SubscriptionGateFeedback(
                     kind: .info,
-                    message: "Terms of Use is a placeholder link in this prototype.",
+                    message: "Terms of Use details are not available in the app yet.",
                     shouldCloseGate: false
                 )
             } label: {
@@ -304,7 +304,7 @@ struct SubscriptionGateView: View {
             Button {
                 linkFeedback = SubscriptionGateFeedback(
                     kind: .info,
-                    message: "Privacy Policy is a placeholder link in this prototype.",
+                    message: "Privacy Policy details are not available in the app yet.",
                     shouldCloseGate: false
                 )
             } label: {

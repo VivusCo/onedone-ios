@@ -80,7 +80,7 @@ struct TaskDetailView: View {
                         Text(
                             appState.shouldUseRemoteTaskActions
                                 ? "Task details are not available yet. Pull to refresh or return to My Tasks."
-                                : "Task no longer exists in mock state."
+                                : "This task is no longer available."
                         )
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
