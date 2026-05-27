@@ -67,12 +67,12 @@ private struct MainTabShell: View {
     @State private var showTaskComposer: Bool = false
 
     private enum ShellLayout {
-        static let barHeight: CGFloat = 62
-        static let insetHeight: CGFloat = 82
-        static let barTopInset: CGFloat = 6
+        static let barHeight: CGFloat = 60
+        static let insetHeight: CGFloat = 74
+        static let barTopInset: CGFloat = 4
         static let barHorizontalPadding: CGFloat = 10
-        static let barBottomPadding: CGFloat = 2
-        static let centerButtonTopOffset: CGFloat = -5
+        static let barBottomPadding: CGFloat = 0
+        static let centerButtonTopOffset: CGFloat = -3
     }
 
     var body: some View {
@@ -140,7 +140,6 @@ private struct MainTabShell: View {
                 .padding(.top, ShellLayout.barTopInset + 8)
 
                 ElevatedTaskTabButton(
-                    title: "Task",
                     accessibilityLabel: "Create task"
                 ) {
                     showTaskComposer = true

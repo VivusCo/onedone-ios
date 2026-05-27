@@ -16,6 +16,7 @@ struct NewTaskView: View {
     @State private var submitErrorMessage: String?
     @State private var splitPreviewMessage: String?
     @State private var lastSubmission: AnalyzeSubmissionState?
+    @FocusState private var isPromptFocused: Bool
 
     private struct AnalyzeSubmissionState: Equatable {
         let prompt: String
@@ -33,6 +34,12 @@ struct NewTaskView: View {
                     .padding(OneDoneStyle.screenPadding)
             }
         }
+        .scrollDismissesKeyboard(.interactively)
+        .simultaneousGesture(
+            TapGesture().onEnded {
+                isPromptFocused = false
+            }
+        )
         .navigationTitle("New Task")
         .navigationBarTitleDisplayMode(.inline)
         .oneDoneScreen()
@@ -78,19 +85,20 @@ struct NewTaskView: View {
 
                     TextEditor(text: $prompt)
                         .font(OneDoneStyle.bodyFont)
+                        .focused($isPromptFocused)
                         .frame(minHeight: 240)
                         .padding(10)
                         .background(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                                .fill(ODColor.surfaceField)
+                                .fill(ODColor.surfacePanelElevated.opacity(0.97))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                                        .fill(ODColor.glassFillSecondary.opacity(0.64))
+                                        .fill(ODColor.glassFillSecondary.opacity(0.58))
                                 )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                                .stroke(ODColor.borderField.opacity(0.9), lineWidth: 0.9)
+                                .stroke(ODColor.borderCard.opacity(0.86), lineWidth: 0.9)
                         )
                         .overlay(alignment: .topLeading) {
                             if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
