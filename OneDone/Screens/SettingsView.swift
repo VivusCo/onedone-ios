@@ -13,7 +13,7 @@ struct SettingsView: View {
                 ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         Text("Account")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         settingsInfoRow(

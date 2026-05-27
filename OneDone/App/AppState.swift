@@ -921,7 +921,7 @@ final class AppState {
         }
 
         guard let task = task(for: taskID), let backendTaskID = task.backendTaskID, !backendTaskID.isEmpty else {
-            return "Marked as sent locally. This task is not linked to backend yet."
+            return "Marked as sent on this device. This task is not linked yet."
         }
 
         let request = MessageMarkedSentRequest(
@@ -945,7 +945,7 @@ final class AppState {
                     task.lastEventPreview = remoteMessage
                     task.timeline.append(
                         TaskTimelineEntry(
-                            title: "Backend sync",
+                            title: "Sync update",
                             detail: remoteMessage,
                             date: Date()
                         )
@@ -963,7 +963,7 @@ final class AppState {
             }
             return nil
         } catch {
-            return "Marked as sent locally, but backend sync failed. \(friendlyRemoteErrorMessage(error))"
+            return "Marked as sent on this device, but sync is temporarily unavailable. \(friendlyRemoteErrorMessage(error))"
         }
     }
 
@@ -990,7 +990,7 @@ final class AppState {
         }
 
         guard let task = task(for: taskID), let backendTaskID = task.backendTaskID, !backendTaskID.isEmpty else {
-            return "Status updated locally. This task is not linked to backend yet."
+            return "Status updated on this device. This task is not linked yet."
         }
 
         do {
@@ -1005,7 +1005,7 @@ final class AppState {
             )
             return nil
         } catch {
-            return "Status updated locally, but backend sync failed. \(friendlyRemoteErrorMessage(error))"
+            return "Status updated on this device, but sync is temporarily unavailable. \(friendlyRemoteErrorMessage(error))"
         }
     }
 
@@ -1061,7 +1061,7 @@ final class AppState {
         }
 
         guard let backendTaskID = normalizeBackendTaskID(existingTask.backendTaskID) else {
-            return "This task is local-only and cannot load backend details yet."
+            return "This task is not linked yet, so details can't refresh right now."
         }
 
         do {
@@ -1712,9 +1712,9 @@ final class AppState {
             case .retryable:
                 return "Could not load tasks right now. Pull to refresh and try again."
             case .remoteActionsDisabled:
-                return "Remote task loading is disabled in this mode."
+                return "Task loading is unavailable right now."
             case .missingBackendTaskID:
-                return "A task sync identifier is missing."
+                return "A task identifier is missing."
             }
         default:
             return "Could not load tasks right now. Pull to refresh and try again."
@@ -1737,9 +1737,9 @@ final class AppState {
             case .retryable:
                 return "Could not load task details right now. Pull to refresh and try again."
             case .remoteActionsDisabled:
-                return "Remote task loading is disabled in this mode."
+                return "Task detail refresh is unavailable right now."
             case .missingBackendTaskID:
-                return "This task is local-only and not linked to backend yet."
+                return "This task is not linked yet."
             }
         default:
             return "Could not load task details right now. Pull to refresh and try again."
@@ -1788,7 +1788,7 @@ final class AppState {
             existingTask?.currentNextStep,
             "Open task detail and continue with the next step."
         )
-        let mappedLastEvent = firstNonEmpty(summary.lastEventPreview, existingTask?.lastEventPreview, "Task synced from backend.")
+        let mappedLastEvent = firstNonEmpty(summary.lastEventPreview, existingTask?.lastEventPreview, "Task synced.")
 
         return MockTask(
             id: localID,

@@ -107,7 +107,7 @@ struct TaskDetailView: View {
         ODCard(style: .default) {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 Text(task.title)
-                    .font(.system(size: 24, weight: .black, design: .rounded))
+                    .font(OneDoneStyle.sectionTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
                     .lineLimit(3)
 
@@ -152,7 +152,7 @@ struct TaskDetailView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                 cardTitle("Current next step")
                 Text(task.currentNextStep)
-                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .font(OneDoneStyle.sectionTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
                     .lineLimit(5)
             }
@@ -410,17 +410,15 @@ struct TaskDetailView: View {
 
     private func cardTitle(_ title: String) -> some View {
         Text(title)
-            .font(OneDoneStyle.captionFont.weight(.semibold))
+            .font(OneDoneStyle.sectionLabelFont)
             .foregroundStyle(ODColor.textSecondary)
-            .textCase(.uppercase)
     }
 
     private func reminderField(label: String, value: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: OneDoneStyle.space8) {
             Text(label)
-                .font(OneDoneStyle.captionFont.weight(.semibold))
+                .font(OneDoneStyle.sectionLabelFont)
                 .foregroundStyle(ODColor.textSecondary)
-                .textCase(.uppercase)
 
             HStack(spacing: OneDoneStyle.tightSpacing) {
                 Image(systemName: icon)
@@ -453,7 +451,7 @@ struct TaskDetailView: View {
                 ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                         Text("Choose reminder date")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         Text("Pick when OneDone should remind you.")
