@@ -7,8 +7,6 @@ struct AppFlow: View {
 
     var body: some View {
         ZStack {
-            ODWarmRadialBackground()
-
             switch appState.phase {
             case .auth:
                 AuthView(appState: appState)

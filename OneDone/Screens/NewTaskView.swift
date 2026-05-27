@@ -86,6 +86,7 @@ struct NewTaskView: View {
                     TextEditor(text: $prompt)
                         .font(OneDoneStyle.bodyFont)
                         .focused($isPromptFocused)
+                        .scrollContentBackground(.hidden)
                         .frame(minHeight: 240)
                         .padding(10)
                         .background(
