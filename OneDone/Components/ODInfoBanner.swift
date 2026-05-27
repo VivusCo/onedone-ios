@@ -34,17 +34,17 @@ struct ODInfoBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(ODColor.surfaceBanner.opacity(0.97))
                 .overlay(
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                        .fill(tone.backgroundColor.opacity(0.72))
+                        .fill(tone.backgroundColor.opacity(0.62))
                 )
         )
         .overlay(
             RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                .stroke(ODColor.glassBorder, lineWidth: 0.9)
+                .stroke(ODColor.borderBanner.opacity(0.92), lineWidth: 0.9)
         )
-        .shadow(color: ODColor.glassShadow.opacity(0.18), radius: 8, x: 0, y: 4)
+        .shadow(color: ODColor.shadowSubtle, radius: OneDoneStyle.panelShadowRadius * 0.7, x: 0, y: OneDoneStyle.panelShadowYOffset * 0.65)
     }
 
     private var iconBackground: Color {

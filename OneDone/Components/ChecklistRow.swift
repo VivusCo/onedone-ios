@@ -53,15 +53,15 @@ struct ChecklistRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: OneDoneStyle.radius12, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(ODColor.surfacePanelElevated.opacity(0.97))
                 .overlay(
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius12, style: .continuous)
-                        .fill(isChecked ? ODColor.statusSuccessFill.opacity(0.55) : ODColor.glassFillSecondary)
+                        .fill(isChecked ? ODColor.statusSuccessFill.opacity(0.47) : ODColor.glassFillSecondary.opacity(0.58))
                 )
         )
         .overlay(
             RoundedRectangle(cornerRadius: OneDoneStyle.radius12, style: .continuous)
-                .stroke(ODColor.glassBorder, lineWidth: 0.85)
+                .stroke(ODColor.borderCard.opacity(0.9), lineWidth: 0.85)
         )
         .opacity(isEnabled ? 1.0 : 0.72)
     }

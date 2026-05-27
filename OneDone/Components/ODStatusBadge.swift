@@ -52,7 +52,7 @@ struct ODStatusBadge: View {
         let borderColor: Color = {
             switch style {
             case .glass:
-                return ODColor.glassBorder.opacity(0.9)
+                return ODColor.borderCard.opacity(0.88)
             case .listRow:
                 return ODColor.border.opacity(0.88)
             }
@@ -61,7 +61,7 @@ struct ODStatusBadge: View {
         let backgroundFill: AnyShapeStyle = {
             switch style {
             case .glass:
-                return AnyShapeStyle(.ultraThinMaterial)
+                return AnyShapeStyle(ODColor.surfaceBadge.opacity(0.96))
             case .listRow:
                 return AnyShapeStyle(ODColor.surfaceStrong.opacity(0.96))
             }
@@ -70,9 +70,9 @@ struct ODStatusBadge: View {
         let toneOpacity: Double = {
             switch style {
             case .glass:
-                return 0.95
+                return 0.92
             case .listRow:
-                return 0.9
+                return 0.88
             }
         }()
 

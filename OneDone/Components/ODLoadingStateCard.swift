@@ -11,21 +11,26 @@ struct ODLoadingStateCard: View {
             VStack(spacing: OneDoneStyle.sectionSpacing) {
                 ZStack {
                     Circle()
-                        .fill(ODColor.accentPrimaryDeepGreen.opacity(0.18))
+                        .fill(ODColor.accentPrimaryDeepGreen.opacity(0.14))
                         .frame(width: 110, height: 110)
-                        .blur(radius: 14)
+
+                    Circle()
+                        .fill(ODColor.accentWarmOrangeSoft.opacity(0.14))
+                        .frame(width: 76, height: 76)
+                        .offset(x: 12, y: 10)
 
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius24, style: .continuous)
-                        .fill(.ultraThinMaterial)
+                        .fill(ODColor.surfacePanelElevated.opacity(0.98))
                         .overlay(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius24, style: .continuous)
-                                .fill(ODColor.glassFillPrimary.opacity(0.9))
+                                .fill(ODColor.glassFillPrimary.opacity(0.62))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius24, style: .continuous)
-                                .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.9)
+                                .stroke(ODColor.borderCard.opacity(0.9), lineWidth: 0.9)
                         )
                         .frame(width: 102, height: 102)
+                        .shadow(color: ODColor.shadowSubtle, radius: OneDoneStyle.panelShadowRadius * 0.8, x: 0, y: OneDoneStyle.panelShadowYOffset * 0.8)
 
                     Image(systemName: symbol)
                         .font(.system(size: 34, weight: .semibold))

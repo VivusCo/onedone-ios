@@ -10,35 +10,45 @@ enum GlassCardStyle {
     var tint: Color {
         switch self {
         case .default:
-            return ODColor.glassFillPrimary
+            return ODColor.glassFillPrimary.opacity(0.48)
         case .strong:
-            return ODColor.glassFillPrimary.opacity(0.85)
+            return ODColor.glassFillPrimary.opacity(0.62)
         case .muted:
-            return ODColor.glassFillSecondary
+            return ODColor.glassFillSecondary.opacity(0.58)
         case .warning:
-            return ODColor.statusWarningFill.opacity(0.45)
+            return ODColor.statusWarningFill.opacity(0.42)
         case .listRow:
-            return ODColor.glassFillPrimary.opacity(0.68)
+            return ODColor.glassFillPrimary.opacity(0.58)
         }
     }
 
     var borderColor: Color {
         switch self {
+        case .default, .strong, .muted:
+            return ODColor.borderCard.opacity(0.92)
         case .warning:
             return ODColor.accentWarmOrangeSoft.opacity(0.65)
         case .listRow:
             return ODColor.border.opacity(0.92)
-        default:
-            return ODColor.glassBorder
         }
     }
 
     var usesMaterialBase: Bool {
+        false
+    }
+
+    var baseColor: Color {
         switch self {
+        case .default:
+            return ODColor.surfacePanel.opacity(0.97)
+        case .strong:
+            return ODColor.surfacePanelElevated.opacity(0.98)
+        case .muted:
+            return ODColor.surfacePanel.opacity(0.96)
+        case .warning:
+            return ODColor.surfacePanelElevated.opacity(0.97)
         case .listRow:
-            return false
-        default:
-            return true
+            return ODColor.surfaceStrong.opacity(0.94)
         }
     }
 
@@ -54,36 +64,50 @@ enum GlassCardStyle {
     var shadowColor: Color {
         switch self {
         case .listRow:
-            return Color.black.opacity(0.03)
+            return ODColor.shadowSubtle
         default:
-            return ODColor.glassShadow
+            return ODColor.shadowSoft
         }
     }
 
     var shadowRadiusMultiplier: CGFloat {
         switch self {
+        case .strong:
+            return 0.9
+        case .default, .warning:
+            return 0.65
+        case .muted:
+            return 0.55
         case .listRow:
-            return 0.25
-        default:
-            return 0.8
+            return 0.24
         }
     }
 
     var shadowYOffsetMultiplier: CGFloat {
         switch self {
+        case .strong:
+            return 0.9
+        case .default, .warning:
+            return 0.7
+        case .muted:
+            return 0.6
         case .listRow:
-            return 0.2
-        default:
-            return 0.8
+            return 0.25
         }
     }
 
     var extraSurfaceGlowOpacity: Double {
         switch self {
+        case .strong:
+            return 0.075
+        case .default:
+            return 0.06
+        case .muted:
+            return 0.05
+        case .warning:
+            return 0.045
         case .listRow:
             return 0.07
-        default:
-            return 0.08
         }
     }
 }
@@ -111,9 +135,7 @@ struct GlassCard<Content: View>: View {
     }
 
     var body: some View {
-        let baseFill = style.usesMaterialBase
-            ? AnyShapeStyle(.ultraThinMaterial)
-            : AnyShapeStyle(ODColor.surfaceStrong.opacity(0.94))
+        let baseFill = AnyShapeStyle(style.baseColor)
 
         content
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -137,16 +159,16 @@ struct GlassCard<Content: View>: View {
             .overlay(alignment: .topLeading) {
                 if style.showsTopHighlight {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .stroke(Color.white.opacity(OneDoneStyle.glassHighlightOpacity * 0.72), lineWidth: 0.55)
+                        .stroke(Color.white.opacity(OneDoneStyle.glassHighlightOpacity * 0.45), lineWidth: 0.5)
                         .padding(0.5)
                         .blendMode(.screen)
                 }
             }
             .shadow(
                 color: includeShadow ? style.shadowColor : .clear,
-                radius: OneDoneStyle.glassShadowRadius * style.shadowRadiusMultiplier,
+                radius: OneDoneStyle.cardShadowRadius * style.shadowRadiusMultiplier,
                 x: 0,
-                y: OneDoneStyle.glassShadowYOffset * style.shadowYOffsetMultiplier
+                y: OneDoneStyle.cardShadowYOffset * style.shadowYOffsetMultiplier
             )
     }
 }

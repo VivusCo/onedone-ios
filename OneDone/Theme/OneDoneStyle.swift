@@ -40,11 +40,15 @@ enum OneDoneStyle {
     static let controlHorizontalPadding: CGFloat = 12
     static let controlVerticalPadding: CGFloat = 10
 
-    // MARK: - Glass Surface
+    // MARK: - Surface Styling
     static let glassBorderWidth: CGFloat = 1
     static let glassShadowRadius: CGFloat = 18
     static let glassShadowYOffset: CGFloat = 8
     static let glassHighlightOpacity: CGFloat = 0.25
+    static let cardShadowRadius: CGFloat = 12
+    static let cardShadowYOffset: CGFloat = 5
+    static let panelShadowRadius: CGFloat = 10
+    static let panelShadowYOffset: CGFloat = 4
 
     // MARK: - Typography
     static let screenTitleFont = Font.system(size: 34, weight: .black, design: .rounded)

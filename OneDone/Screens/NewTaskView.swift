@@ -82,15 +82,15 @@ struct NewTaskView: View {
                         .padding(10)
                         .background(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                                .fill(.ultraThinMaterial)
+                                .fill(ODColor.surfaceField)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                                        .fill(ODColor.glassFillSecondary)
+                                        .fill(ODColor.glassFillSecondary.opacity(0.64))
                                 )
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                                .stroke(ODColor.glassBorder, lineWidth: 0.9)
+                                .stroke(ODColor.borderField.opacity(0.9), lineWidth: 0.9)
                         )
                         .overlay(alignment: .topLeading) {
                             if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

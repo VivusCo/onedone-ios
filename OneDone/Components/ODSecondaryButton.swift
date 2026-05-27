@@ -33,14 +33,20 @@ struct ODSecondaryButton: View {
 
     private var buttonBackground: some View {
         RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-            .fill(.ultraThinMaterial)
+            .fill(ODColor.surfacePanelElevated)
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .fill(ODColor.glassFillSecondary.opacity(0.95))
+                    .fill(ODColor.glassFillSecondary.opacity(0.68))
             )
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.buttonCornerRadius, style: .continuous)
-                    .stroke(isDisabled ? ODColor.border.opacity(0.52) : ODColor.glassBorder.opacity(0.92), lineWidth: 0.9)
+                    .stroke(isDisabled ? ODColor.border.opacity(0.52) : ODColor.borderCard.opacity(0.9), lineWidth: 0.9)
+            )
+            .shadow(
+                color: isDisabled ? .clear : ODColor.shadowSubtle,
+                radius: OneDoneStyle.panelShadowRadius * 0.55,
+                x: 0,
+                y: OneDoneStyle.panelShadowYOffset * 0.5
             )
     }
 }

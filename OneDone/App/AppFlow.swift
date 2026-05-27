@@ -113,16 +113,16 @@ private struct MainTabShell: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(ODColor.surfaceNav.opacity(0.98))
                     .overlay(
                         RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .fill(ODColor.glassFillPrimary.opacity(0.70))
+                            .fill(ODColor.glassFillPrimary.opacity(0.55))
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .stroke(ODColor.glassBorder.opacity(0.90), lineWidth: 0.9)
+                            .stroke(ODColor.borderCard.opacity(0.92), lineWidth: 0.9)
                     )
-                    .shadow(color: Color.black.opacity(0.12), radius: 18, x: 0, y: 10)
+                    .shadow(color: ODColor.shadowSoft.opacity(0.7), radius: OneDoneStyle.panelShadowRadius, x: 0, y: OneDoneStyle.panelShadowYOffset)
                     .frame(height: ShellLayout.barHeight)
                     .padding(.top, ShellLayout.barTopInset)
 

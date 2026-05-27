@@ -55,15 +55,15 @@ struct AuthView: View {
                                 .padding(.vertical, OneDoneStyle.controlVerticalPadding)
                                 .background(
                                     RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                        .fill(.ultraThinMaterial)
+                                        .fill(ODColor.surfaceField)
                                         .overlay(
                                             RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                                .fill(ODColor.glassFillSecondary)
+                                                .fill(ODColor.glassFillSecondary.opacity(0.66))
                                         )
                                 )
                                 .overlay(
                                     RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                                        .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.9)
+                                        .stroke(ODColor.borderField.opacity(0.9), lineWidth: 0.9)
                                 )
                         }
                     }
