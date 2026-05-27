@@ -18,7 +18,7 @@ struct AccessView: View {
                         )
 
                         Text(accessHeadline)
-                            .font(.system(size: 28, weight: .black, design: .rounded))
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
                             .lineLimit(3)
 
@@ -99,7 +99,7 @@ struct AccessView: View {
                                 .font(OneDoneStyle.cardTitleFont)
                                 .foregroundStyle(ODColor.textPrimary)
 
-                            Text("Use local mock states for development and previews.")
+                            Text("Use preview access states for development and previews.")
                                 .font(OneDoneStyle.subheadlineFont)
                                 .foregroundStyle(ODColor.textSecondary)
 

@@ -79,8 +79,8 @@ struct ODInfoBanner: View {
 #Preview {
     VStack(spacing: 12) {
         ODInfoBanner(
-            title: "Local mock data",
-            message: "This prototype currently uses local-only state and UI responses."
+            title: "Preview data",
+            message: "Sample data is shown in this preview."
         )
         ODInfoBanner(
             title: "Trial gate",

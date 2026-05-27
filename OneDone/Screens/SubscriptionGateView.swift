@@ -22,7 +22,7 @@ struct SubscriptionGateView: View {
                         )
 
                         Text(headline)
-                            .font(.system(size: 30, weight: .black, design: .rounded))
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
                             .lineLimit(3)
 
