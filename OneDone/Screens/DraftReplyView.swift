@@ -57,7 +57,7 @@ struct DraftReplyView: View {
                     }
                 } else {
                     ODCard {
-                        Text("Task no longer exists in mock state.")
+                        Text("We couldn’t find this task.")
                             .font(OneDoneStyle.bodyFont)
                             .foregroundStyle(ODColor.textSecondary)
                     }
@@ -92,8 +92,8 @@ struct DraftReplyView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 HStack(alignment: .center, spacing: OneDoneStyle.tightSpacing) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.space4) {
-                        Text("Draft Reply")
-                            .font(.system(size: 24, weight: .black, design: .rounded))
+                        Text("Your message")
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
                             .lineLimit(1)
 
@@ -112,11 +112,15 @@ struct DraftReplyView: View {
                     .padding(.vertical, OneDoneStyle.controlVerticalPadding)
                     .background(
                         RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                            .fill(ODColor.surface)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                    .fill(ODColor.glassFillSecondary)
+                            )
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                            .stroke(ODColor.border, lineWidth: 1)
+                            .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.9)
                     )
 
                 TextEditor(text: $messageBody)
@@ -125,11 +129,15 @@ struct DraftReplyView: View {
                     .padding(8)
                     .background(
                         RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                            .fill(ODColor.surface)
+                            .fill(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
+                                    .fill(ODColor.glassFillSecondary)
+                            )
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: OneDoneStyle.controlCornerRadius, style: .continuous)
-                            .stroke(ODColor.border, lineWidth: 1)
+                            .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.9)
                     )
 
                 HStack(spacing: OneDoneStyle.tightSpacing) {

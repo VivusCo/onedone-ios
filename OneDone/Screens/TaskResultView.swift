@@ -54,11 +54,11 @@ struct TaskResultView: View {
                 ODCard(style: .strong) {
                     VStack(alignment: .leading, spacing: OneDoneStyle.tightSpacing) {
                         Text("Next step")
-                            .font(OneDoneStyle.captionFont.weight(.semibold))
+                            .font(OneDoneStyle.sectionLabelFont)
                             .foregroundStyle(ODColor.accentPrimaryDeepGreen)
 
                         Text(nextStepText)
-                            .font(.system(size: 25, weight: .black, design: .rounded))
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
                             .lineLimit(4)
                     }
