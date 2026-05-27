@@ -13,6 +13,18 @@ struct TaskDetailView: View {
     @State private var isLoadingRemoteTaskDetail: Bool = false
     @State private var remoteDetailErrorMessage: String?
     @State private var hasTriggeredInitialRemoteLoad: Bool = false
+    private static let displayDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        return formatter
+    }()
+    private static let displayDateTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     private var task: MockTask? {
         appState.task(for: taskID)
@@ -119,7 +131,7 @@ struct TaskDetailView: View {
 
                     Spacer()
 
-                    Text("Created \(dateTimeFormatter.string(from: task.createdAt))")
+                    Text("Created \(Self.displayDateTimeFormatter.string(from: task.createdAt))")
                         .font(OneDoneStyle.captionFont)
                         .foregroundStyle(ODColor.textSecondary)
                         .lineLimit(1)
@@ -239,13 +251,13 @@ struct TaskDetailView: View {
                 if let reminderDate = task.reminderDate {
                     reminderField(
                         label: "Date and time",
-                        value: dateTimeFormatter.string(from: reminderDate),
+                        value: Self.displayDateTimeFormatter.string(from: reminderDate),
                         icon: "bell"
                     )
                 } else if let dueDate = task.dueDate {
                     reminderField(
                         label: "Due date",
-                        value: dateTimeFormatter.string(from: dueDate),
+                        value: Self.displayDateTimeFormatter.string(from: dueDate),
                         icon: "calendar"
                     )
                 } else {
@@ -341,17 +353,19 @@ struct TaskDetailView: View {
     }
 
     private func timelineSection(_ task: MockTask) -> some View {
-        ODCard(style: .muted) {
+        let timelineEntries = compactTimeline(for: task)
+
+        return ODCard(style: .muted) {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 cardTitle("Timeline")
 
-                if compactTimeline(for: task).isEmpty {
+                if timelineEntries.isEmpty {
                     Text("No timeline events yet.")
                         .font(OneDoneStyle.bodyFont)
                         .foregroundStyle(ODColor.textSecondary)
                 } else {
                     VStack(spacing: OneDoneStyle.tightSpacing) {
-                        ForEach(compactTimeline(for: task)) { entry in
+                        ForEach(timelineEntries) { entry in
                             HStack(alignment: .top, spacing: OneDoneStyle.tightSpacing) {
                                 Circle()
                                     .fill(ODColor.accentPrimaryDeepGreen)
@@ -367,7 +381,7 @@ struct TaskDetailView: View {
 
                                         Spacer()
 
-                                        Text(dateFormatter.string(from: entry.date))
+                                        Text(Self.displayDateFormatter.string(from: entry.date))
                                             .font(OneDoneStyle.captionFont)
                                             .foregroundStyle(ODColor.textMuted)
                                             .lineLimit(1)
@@ -400,10 +414,10 @@ struct TaskDetailView: View {
 
     private func dueOrReminderText(_ task: MockTask) -> String? {
         if let reminderDate = task.reminderDate {
-            return "Reminder \(dateFormatter.string(from: reminderDate))"
+            return "Reminder \(Self.displayDateFormatter.string(from: reminderDate))"
         }
         if let dueDate = task.dueDate {
-            return "Due \(dateFormatter.string(from: dueDate))"
+            return "Due \(Self.displayDateFormatter.string(from: dueDate))"
         }
         return nil
     }
@@ -554,20 +568,6 @@ struct TaskDetailView: View {
         case .warning:
             return "bell.slash"
         }
-    }
-
-    private var dateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
-        return formatter
-    }
-
-    private var dateTimeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
     }
 
     private func tone(for status: TaskStatus) -> ODStatusTone {

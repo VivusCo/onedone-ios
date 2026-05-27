@@ -9,8 +9,16 @@ struct MyTasksView: View {
     @State private var hasTriggeredInitialRemoteLoad: Bool = false
     @State private var showCreateTask: Bool = false
     @State private var showSubscriptionGate: Bool = false
+    private static let scheduleDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
 
     var body: some View {
+        let visibleTasks = filteredAndSortedTasks
+
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
                 ODSectionHeader(
@@ -18,7 +26,7 @@ struct MyTasksView: View {
                     subtitle: "Track active work and what needs attention"
                 )
 
-                if filteredAndSortedTasks.isEmpty {
+                if visibleTasks.isEmpty {
                     IllustrationCard(
                         title: "Keep momentum",
                         subtitle: "Prioritized by what needs your attention first.",
@@ -32,7 +40,7 @@ struct MyTasksView: View {
                                 .font(OneDoneStyle.cardTitleFont)
                                 .foregroundStyle(ODColor.textPrimary)
                             Spacer(minLength: OneDoneStyle.space8)
-                            Text("\(filteredAndSortedTasks.count) in view")
+                            Text("\(visibleTasks.count) in view")
                                 .font(OneDoneStyle.captionFont.weight(.semibold))
                                 .foregroundStyle(ODColor.textSecondary)
                         }
@@ -82,7 +90,7 @@ struct MyTasksView: View {
                     }
                 }
 
-                if filteredAndSortedTasks.isEmpty {
+                if visibleTasks.isEmpty {
                     if selectedFilter == .all {
                         VStack(spacing: OneDoneStyle.sectionSpacing) {
                             IllustrationCard(
@@ -122,8 +130,8 @@ struct MyTasksView: View {
                         }
                     }
                 } else {
-                    VStack(spacing: OneDoneStyle.contentSpacing) {
-                        ForEach(filteredAndSortedTasks) { task in
+                    LazyVStack(spacing: OneDoneStyle.contentSpacing) {
+                        ForEach(visibleTasks) { task in
                             NavigationLink {
                                 TaskDetailView(appState: appState, taskID: task.id)
                             } label: {
@@ -251,19 +259,12 @@ struct MyTasksView: View {
 
     private func scheduleText(for task: MockTask) -> String? {
         if let reminderDate = task.reminderDate {
-            return "Reminder \(dateFormatter.string(from: reminderDate))"
+            return "Reminder \(Self.scheduleDateFormatter.string(from: reminderDate))"
         }
         if let dueDate = task.dueDate {
-            return "Due \(dateFormatter.string(from: dueDate))"
+            return "Due \(Self.scheduleDateFormatter.string(from: dueDate))"
         }
         return nil
-    }
-
-    private var dateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
     }
 
     private func tone(for status: TaskStatus) -> ODStatusTone {
