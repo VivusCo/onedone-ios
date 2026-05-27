@@ -143,7 +143,8 @@ struct MyTasksView: View {
                                     scheduleText: scheduleText(for: task),
                                     nextStepPreview: task.currentNextStep,
                                     lastEventPreview: task.lastEventPreview,
-                                    style: .muted
+                                    style: .listRow,
+                                    badgeStyle: .listRow
                                 )
                             }
                             .buttonStyle(.plain)

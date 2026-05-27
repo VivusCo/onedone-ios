@@ -9,6 +9,7 @@ struct TaskCard: View {
     var nextStepPreview: String? = nil
     var lastEventPreview: String? = nil
     var style: GlassCardStyle = .default
+    var badgeStyle: ODStatusBadge.Style = .glass
     var onTap: (() -> Void)? = nil
 
     var body: some View {
@@ -37,7 +38,7 @@ struct TaskCard: View {
 
                     Spacer(minLength: 8)
 
-                    ODStatusBadge(title: statusTitle, tone: statusTone)
+                    ODStatusBadge(title: statusTitle, tone: statusTone, style: badgeStyle)
                         .layoutPriority(3)
                 }
 

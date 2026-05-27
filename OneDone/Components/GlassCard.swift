@@ -5,6 +5,7 @@ enum GlassCardStyle {
     case strong
     case muted
     case warning
+    case listRow
 
     var tint: Color {
         switch self {
@@ -16,6 +17,8 @@ enum GlassCardStyle {
             return ODColor.glassFillSecondary
         case .warning:
             return ODColor.statusWarningFill.opacity(0.45)
+        case .listRow:
+            return ODColor.glassFillPrimary.opacity(0.82)
         }
     }
 
@@ -23,8 +26,46 @@ enum GlassCardStyle {
         switch self {
         case .warning:
             return ODColor.accentWarmOrangeSoft.opacity(0.65)
+        case .listRow:
+            return ODColor.glassBorder.opacity(0.72)
         default:
             return ODColor.glassBorder
+        }
+    }
+
+    var usesMaterialBase: Bool {
+        switch self {
+        case .listRow:
+            return false
+        default:
+            return true
+        }
+    }
+
+    var showsTopHighlight: Bool {
+        switch self {
+        case .listRow:
+            return false
+        default:
+            return true
+        }
+    }
+
+    var shadowColor: Color {
+        switch self {
+        case .listRow:
+            return .clear
+        default:
+            return ODColor.glassShadow
+        }
+    }
+
+    var extraSurfaceGlowOpacity: Double {
+        switch self {
+        case .listRow:
+            return 0.03
+        default:
+            return 0.08
         }
     }
 }
@@ -52,19 +93,23 @@ struct GlassCard<Content: View>: View {
     }
 
     var body: some View {
+        let baseFill = style.usesMaterialBase
+            ? AnyShapeStyle(.ultraThinMaterial)
+            : AnyShapeStyle(ODColor.surface.opacity(0.92))
+
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(contentPadding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(baseFill)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(style.tint)
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Color.white.opacity(0.08))
+                            .fill(Color.white.opacity(style.extraSurfaceGlowOpacity))
                     )
             )
             .overlay(
@@ -72,13 +117,15 @@ struct GlassCard<Content: View>: View {
                     .stroke(style.borderColor.opacity(0.9), lineWidth: OneDoneStyle.glassBorderWidth)
             )
             .overlay(alignment: .topLeading) {
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(OneDoneStyle.glassHighlightOpacity * 0.72), lineWidth: 0.55)
-                    .padding(0.5)
-                    .blendMode(.screen)
+                if style.showsTopHighlight {
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .stroke(Color.white.opacity(OneDoneStyle.glassHighlightOpacity * 0.72), lineWidth: 0.55)
+                        .padding(0.5)
+                        .blendMode(.screen)
+                }
             }
             .shadow(
-                color: includeShadow ? ODColor.glassShadow : .clear,
+                color: includeShadow ? style.shadowColor : .clear,
                 radius: OneDoneStyle.glassShadowRadius * 0.8,
                 x: 0,
                 y: OneDoneStyle.glassShadowYOffset * 0.8
@@ -114,6 +161,12 @@ struct GlassCard<Content: View>: View {
 
             GlassCard(style: .warning) {
                 Text("Warning variant")
+                    .font(OneDoneStyle.bodyFont)
+                    .foregroundStyle(ODColor.textPrimary)
+            }
+
+            GlassCard(style: .listRow) {
+                Text("List row variant")
                     .font(OneDoneStyle.bodyFont)
                     .foregroundStyle(ODColor.textPrimary)
             }
