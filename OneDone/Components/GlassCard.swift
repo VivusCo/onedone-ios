@@ -18,7 +18,7 @@ enum GlassCardStyle {
         case .warning:
             return ODColor.statusWarningFill.opacity(0.45)
         case .listRow:
-            return ODColor.glassFillPrimary.opacity(0.82)
+            return ODColor.glassFillPrimary.opacity(0.68)
         }
     }
 
@@ -27,7 +27,7 @@ enum GlassCardStyle {
         case .warning:
             return ODColor.accentWarmOrangeSoft.opacity(0.65)
         case .listRow:
-            return ODColor.glassBorder.opacity(0.72)
+            return ODColor.border.opacity(0.92)
         default:
             return ODColor.glassBorder
         }
@@ -54,16 +54,34 @@ enum GlassCardStyle {
     var shadowColor: Color {
         switch self {
         case .listRow:
-            return .clear
+            return Color.black.opacity(0.03)
         default:
             return ODColor.glassShadow
+        }
+    }
+
+    var shadowRadiusMultiplier: CGFloat {
+        switch self {
+        case .listRow:
+            return 0.25
+        default:
+            return 0.8
+        }
+    }
+
+    var shadowYOffsetMultiplier: CGFloat {
+        switch self {
+        case .listRow:
+            return 0.2
+        default:
+            return 0.8
         }
     }
 
     var extraSurfaceGlowOpacity: Double {
         switch self {
         case .listRow:
-            return 0.03
+            return 0.07
         default:
             return 0.08
         }
@@ -95,7 +113,7 @@ struct GlassCard<Content: View>: View {
     var body: some View {
         let baseFill = style.usesMaterialBase
             ? AnyShapeStyle(.ultraThinMaterial)
-            : AnyShapeStyle(ODColor.surface.opacity(0.92))
+            : AnyShapeStyle(ODColor.surfaceStrong.opacity(0.94))
 
         content
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -114,7 +132,7 @@ struct GlassCard<Content: View>: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(style.borderColor.opacity(0.9), lineWidth: OneDoneStyle.glassBorderWidth)
+                    .stroke(style.borderColor.opacity(style == .listRow ? 1 : 0.9), lineWidth: OneDoneStyle.glassBorderWidth)
             )
             .overlay(alignment: .topLeading) {
                 if style.showsTopHighlight {
@@ -126,9 +144,9 @@ struct GlassCard<Content: View>: View {
             }
             .shadow(
                 color: includeShadow ? style.shadowColor : .clear,
-                radius: OneDoneStyle.glassShadowRadius * 0.8,
+                radius: OneDoneStyle.glassShadowRadius * style.shadowRadiusMultiplier,
                 x: 0,
-                y: OneDoneStyle.glassShadowYOffset * 0.8
+                y: OneDoneStyle.glassShadowYOffset * style.shadowYOffsetMultiplier
             )
     }
 }
