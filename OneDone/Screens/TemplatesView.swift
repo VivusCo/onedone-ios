@@ -63,7 +63,7 @@ struct TemplatesView: View {
     }
 
     private func templateRow(_ template: TaskTemplate) -> some View {
-        ODCard(contentPadding: 14, style: .strong) {
+        ODCard(contentPadding: 14, style: .listRow) {
             HStack(spacing: OneDoneStyle.contentSpacing) {
                 templateOrb(icon: templateIcon(for: template), tone: templateOrbTone(for: template))
 
@@ -91,14 +91,14 @@ struct TemplatesView: View {
     private func templateOrb(icon: String, tone: TemplateOrbTone) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(ODColor.surfaceStrong.opacity(0.95))
                 .overlay(
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                        .fill(tone.background)
+                        .fill(tone.background.opacity(0.88))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                        .stroke(ODColor.glassBorder, lineWidth: 0.85)
+                        .stroke(ODColor.border.opacity(0.86), lineWidth: 0.85)
                 )
                 .frame(width: 44, height: 44)
 

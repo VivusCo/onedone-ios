@@ -250,15 +250,15 @@ struct ClarificationView: View {
             .padding(.vertical, 14)
             .background(
                 RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(ODColor.surfacePanelElevated.opacity(0.97))
                     .overlay(
                         RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                            .fill(selectedOption == option ? ODColor.primarySoft.opacity(0.9) : ODColor.glassFillSecondary)
+                            .fill(selectedOption == option ? ODColor.primarySoft.opacity(0.75) : ODColor.glassFillSecondary.opacity(0.58))
                     )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                    .stroke(ODColor.glassBorder, lineWidth: 0.9)
+                    .stroke(ODColor.borderCard.opacity(0.9), lineWidth: 0.9)
             )
         }
         .buttonStyle(.plain)

@@ -7,11 +7,24 @@ enum ODColor {
     static let backgroundAccentRadialB = Color(red: 0.93, green: 0.69, blue: 0.46).opacity(0.27)
     static let backgroundAccentRadialC = Color(red: 1.00, green: 0.98, blue: 0.95).opacity(0.18)
 
-    // MARK: - Glass Surfaces
+    // MARK: - Legacy Glass-Tinted Colors
     static let glassFillPrimary = Color(red: 1.00, green: 0.99, blue: 0.97).opacity(0.56)
     static let glassFillSecondary = Color(red: 1.00, green: 0.99, blue: 0.97).opacity(0.42)
     static let glassBorder = Color.white.opacity(0.52)
     static let glassShadow = Color.black.opacity(0.065)
+
+    // MARK: - Unified Non-Material Surfaces
+    static let surfacePanel = Color(red: 0.972, green: 0.966, blue: 0.949)
+    static let surfacePanelElevated = Color(red: 0.982, green: 0.976, blue: 0.961)
+    static let surfaceField = Color(red: 0.985, green: 0.980, blue: 0.966)
+    static let surfaceBadge = Color(red: 0.976, green: 0.970, blue: 0.953)
+    static let surfaceBanner = Color(red: 0.973, green: 0.967, blue: 0.951)
+    static let surfaceNav = Color(red: 0.968, green: 0.962, blue: 0.945)
+    static let borderCard = Color(red: 0.846, green: 0.851, blue: 0.810)
+    static let borderField = Color(red: 0.833, green: 0.841, blue: 0.796)
+    static let borderBanner = Color(red: 0.838, green: 0.845, blue: 0.804)
+    static let shadowSubtle = Color.black.opacity(0.042)
+    static let shadowSoft = Color.black.opacity(0.06)
 
     // MARK: - Semantic Brand Colors
     static let accentPrimaryDeepGreen = Color(red: 0.12, green: 0.37, blue: 0.25)

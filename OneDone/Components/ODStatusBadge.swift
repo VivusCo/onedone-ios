@@ -39,10 +39,43 @@ enum ODStatusTone {
 }
 
 struct ODStatusBadge: View {
+    enum Style {
+        case glass
+        case listRow
+    }
+
     let title: String
     var tone: ODStatusTone = .neutral
+    var style: Style = .glass
 
     var body: some View {
+        let borderColor: Color = {
+            switch style {
+            case .glass:
+                return ODColor.borderCard.opacity(0.88)
+            case .listRow:
+                return ODColor.border.opacity(0.88)
+            }
+        }()
+
+        let backgroundFill: AnyShapeStyle = {
+            switch style {
+            case .glass:
+                return AnyShapeStyle(ODColor.surfaceBadge.opacity(0.96))
+            case .listRow:
+                return AnyShapeStyle(ODColor.surfaceStrong.opacity(0.96))
+            }
+        }()
+
+        let toneOpacity: Double = {
+            switch style {
+            case .glass:
+                return 0.92
+            case .listRow:
+                return 0.88
+            }
+        }()
+
         Text(title)
             .font(OneDoneStyle.badgeFont)
             .foregroundStyle(tone.textColor)
@@ -53,15 +86,15 @@ struct ODStatusBadge: View {
             .padding(.vertical, 6)
             .background(
                 Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(backgroundFill)
                     .overlay(
                         Capsule(style: .continuous)
-                            .fill(tone.backgroundColor.opacity(0.95))
+                            .fill(tone.backgroundColor.opacity(toneOpacity))
                     )
             )
             .overlay(
                 Capsule(style: .continuous)
-                    .stroke(ODColor.glassBorder.opacity(0.9), lineWidth: 0.8)
+                    .stroke(borderColor, lineWidth: 0.8)
             )
             .fixedSize(horizontal: true, vertical: false)
             .accessibilityLabel(title)
@@ -78,7 +111,7 @@ struct ODStatusBadge: View {
 
         HStack {
             ODStatusBadge(title: "Locked", tone: .locked)
-            ODStatusBadge(title: "Waiting for reply", tone: .neutral)
+            ODStatusBadge(title: "Waiting for reply", tone: .neutral, style: .listRow)
         }
     }
     .padding()

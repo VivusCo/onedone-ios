@@ -134,10 +134,14 @@ struct HomeView: View {
                 .padding(10)
                 .background(
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                        .fill(.ultraThinMaterial)
+                        .fill(ODColor.surfacePanelElevated.opacity(0.98))
                         .overlay(
                             RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
-                                .stroke(ODColor.glassBorder, lineWidth: 0.85)
+                                .fill(ODColor.glassFillSecondary.opacity(0.58))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: OneDoneStyle.radius16, style: .continuous)
+                                .stroke(ODColor.borderCard.opacity(0.9), lineWidth: 0.85)
                         )
                 )
                 .accessibilityLabel("Notifications")
@@ -266,15 +270,15 @@ struct HomeView: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                .fill(.ultraThinMaterial)
+                .fill(ODColor.surfacePanelElevated.opacity(0.97))
                 .overlay(
                     RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                        .fill(ODColor.glassFillSecondary)
+                        .fill(ODColor.glassFillSecondary.opacity(0.62))
                 )
         )
         .overlay(
             RoundedRectangle(cornerRadius: OneDoneStyle.radius20, style: .continuous)
-                .stroke(ODColor.glassBorder, lineWidth: 0.85)
+                .stroke(ODColor.borderCard.opacity(0.9), lineWidth: 0.85)
         )
     }
 
