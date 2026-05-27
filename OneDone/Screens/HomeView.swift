@@ -116,13 +116,13 @@ struct HomeView: View {
 
     private var headerBar: some View {
         HStack(alignment: .top, spacing: OneDoneStyle.contentSpacing) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: OneDoneStyle.space8) {
                 Text("Good morning")
-                    .font(.system(size: 28, weight: .black, design: .rounded))
+                    .font(OneDoneStyle.screenTitleFont)
                     .foregroundStyle(ODColor.textPrimary)
 
                 Text("Pick one admin task and move it forward.")
-                    .font(OneDoneStyle.subheadlineFont)
+                    .font(OneDoneStyle.helperFont)
                     .foregroundStyle(ODColor.textSecondary)
             }
 
@@ -221,7 +221,7 @@ struct HomeView: View {
             VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("What OneDone can help with")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+                        .font(OneDoneStyle.cardHeadlineFont)
                         .foregroundStyle(ODColor.textPrimary)
 
                     Text("Choose a shortcut or tap + to start fresh.")

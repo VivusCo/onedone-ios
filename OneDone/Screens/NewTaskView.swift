@@ -64,8 +64,8 @@ struct NewTaskView: View {
     private var composeTaskBlock: some View {
         VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
             IllustrationCard(
-                title: "Text-first MVP",
-                subtitle: "Paste message, bill, or policy text. Attachments and OCR stay coming soon.",
+                title: "Start with text",
+                subtitle: "Paste the message or issue you want help with.",
                 variant: .focused,
                 minHeight: 126
             )
@@ -113,12 +113,9 @@ struct NewTaskView: View {
                         .padding(.horizontal, 2)
                     }
 
-                    HStack(spacing: OneDoneStyle.tightSpacing) {
-                        ODComingSoonBadge(text: "Attachments/OCR coming soon")
-                        Text("Paste text only in MVP")
-                            .font(OneDoneStyle.captionFont)
-                            .foregroundStyle(ODColor.textSecondary)
-                    }
+                    Text("Paste text for now.")
+                        .font(OneDoneStyle.helperFont)
+                        .foregroundStyle(ODColor.textSecondary)
                 }
             }
 
@@ -177,52 +174,18 @@ struct NewTaskView: View {
 
     private var analyzingStateBlock: some View {
         VStack(spacing: OneDoneStyle.sectionSpacing) {
-            Spacer(minLength: 50)
+            Spacer(minLength: OneDoneStyle.space24)
 
-            ZStack {
-                Circle()
-                    .fill(ODColor.accentPrimaryDeepGreen.opacity(0.20))
-                    .frame(width: 116, height: 116)
-                    .blur(radius: 14)
+            ODLoadingStateCard(
+                title: "Finding the next step",
+                message: "If anything important is missing, OneDone will ask one clear question.",
+                symbol: "sparkles",
+                minHeight: 330
+            )
 
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .fill(ODColor.glassFillPrimary.opacity(0.8))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .stroke(ODColor.glassBorder, lineWidth: 0.9)
-                    )
-                    .frame(width: 112, height: 112)
-                    .shadow(color: ODColor.glassShadow.opacity(0.75), radius: 16, x: 0, y: 8)
-
-                Image(systemName: "sparkles")
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(ODColor.accentPrimaryDeepGreen)
-            }
-
-            VStack(spacing: OneDoneStyle.tightSpacing) {
-                Text("Finding the next step")
-                    .font(.system(size: 26, weight: .black, design: .rounded))
-                    .foregroundStyle(ODColor.textPrimary)
-                    .multilineTextAlignment(.center)
-
-                Text("If anything important is missing, OneDone will ask one clear question.")
-                    .font(OneDoneStyle.subheadlineFont)
-                    .foregroundStyle(ODColor.textSecondary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
-            }
-
-            ProgressView()
-                .tint(ODColor.accentPrimaryDeepGreen)
-                .padding(.top, OneDoneStyle.space4)
-
-            Spacer(minLength: 40)
+            Spacer(minLength: OneDoneStyle.space16)
         }
-        .frame(maxWidth: .infinity, minHeight: 560)
+        .frame(maxWidth: .infinity, minHeight: 520)
     }
 
     private func metadataChip(title: String, tone: ODStatusTone = .neutral) -> some View {

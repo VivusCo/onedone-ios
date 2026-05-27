@@ -9,12 +9,13 @@ struct TemplatesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OneDoneStyle.sectionSpacing) {
-                ODSectionHeader(
-                    title: "Templates",
-                    subtitle: appState.canCreateNewTasks
+                Text(
+                    appState.canCreateNewTasks
                         ? "Start with a familiar situation."
                         : "Creation is locked. Tap any template to open access options."
                 )
+                .font(OneDoneStyle.helperFont)
+                .foregroundStyle(ODColor.textSecondary)
 
                 if appState.templates.isEmpty {
                     ODCard(style: .muted) {
@@ -62,7 +63,7 @@ struct TemplatesView: View {
     }
 
     private func templateRow(_ template: TaskTemplate) -> some View {
-        ODCard(contentPadding: 14, style: .default) {
+        ODCard(contentPadding: 14, style: .strong) {
             HStack(spacing: OneDoneStyle.contentSpacing) {
                 templateOrb(icon: templateIcon(for: template), tone: templateOrbTone(for: template))
 

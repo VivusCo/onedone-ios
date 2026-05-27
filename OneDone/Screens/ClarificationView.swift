@@ -30,12 +30,16 @@ struct ClarificationView: View {
                     VStack(alignment: .leading, spacing: OneDoneStyle.contentSpacing) {
                         ODStatusBadge(title: "Needs clarification", tone: .warning)
 
+                        Text("One detail to continue")
+                            .font(OneDoneStyle.sectionLabelFont)
+                            .foregroundStyle(ODColor.accentPrimaryDeepGreen)
+
                         Text(activeDraft.clarificationQuestion)
-                            .font(.system(size: 24, weight: .black, design: .rounded))
+                            .font(OneDoneStyle.sectionTitleFont)
                             .foregroundStyle(ODColor.textPrimary)
 
                         Text(clarificationContextText)
-                            .font(OneDoneStyle.subheadlineFont)
+                            .font(OneDoneStyle.helperFont)
                             .foregroundStyle(ODColor.textSecondary)
                             .lineLimit(3)
                     }
