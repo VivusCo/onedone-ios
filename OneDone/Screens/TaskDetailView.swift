@@ -13,6 +13,7 @@ struct TaskDetailView: View {
     @State private var isLoadingRemoteTaskDetail: Bool = false
     @State private var remoteDetailErrorMessage: String?
     @State private var hasTriggeredInitialRemoteLoad: Bool = false
+    @State private var checkedChecklistIndexes: Set<Int> = []
     private static let displayDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
@@ -98,6 +99,9 @@ struct TaskDetailView: View {
                             .foregroundStyle(ODColor.textSecondary)
                     }
                 }
+
+                Color.clear
+                    .frame(height: OneDoneStyle.tabRootContentBottomClearance)
             }
             .padding(OneDoneStyle.screenPadding)
         }
@@ -190,8 +194,15 @@ struct TaskDetailView: View {
                         .foregroundStyle(ODColor.textSecondary)
                 } else {
                     VStack(spacing: OneDoneStyle.tightSpacing) {
-                        ForEach(Array(task.actionPlan.enumerated()), id: \.offset) { _, step in
-                            ChecklistRow(text: step, isChecked: false, isEnabled: true, onToggle: nil)
+                        ForEach(Array(task.actionPlan.enumerated()), id: \.offset) { index, step in
+                            ChecklistRow(
+                                text: step,
+                                isChecked: checkedChecklistIndexes.contains(index),
+                                isEnabled: true
+                            ) {
+                                toggleChecklist(index)
+                            }
+                            .accessibilityLabel("Checklist item \(index + 1): \(step)")
                         }
                     }
                 }
@@ -374,7 +385,7 @@ struct TaskDetailView: View {
 
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack(alignment: .firstTextBaseline) {
-                                        Text(entry.title)
+                                        Text(displayTimelineTitle(entry.title))
                                             .font(OneDoneStyle.subheadlineFont.weight(.semibold))
                                             .foregroundStyle(ODColor.textPrimary)
                                             .lineLimit(1)
@@ -410,6 +421,35 @@ struct TaskDetailView: View {
             .sorted { $0.date > $1.date }
             .prefix(3)
             .map { $0 }
+    }
+
+    private func displayTimelineTitle(_ rawTitle: String) -> String {
+        let normalized = rawTitle
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        switch normalized {
+        case "task_updated":
+            return "Task updated"
+        case "reply_generated":
+            return "Reply generated"
+        case "reminder_scheduled":
+            return "Reminder scheduled"
+        case "message_marked_sent":
+            return "Message marked as sent"
+        default:
+            let words = normalized
+                .replacingOccurrences(of: "_", with: " ")
+                .replacingOccurrences(of: "-", with: " ")
+                .split(whereSeparator: \.isWhitespace)
+                .map { word -> String in
+                    let lower = word.lowercased()
+                    guard let first = lower.first else { return "" }
+                    return first.uppercased() + lower.dropFirst()
+                }
+            let fallback = words.joined(separator: " ")
+            return fallback.isEmpty ? rawTitle : fallback
+        }
     }
 
     private func dueOrReminderText(_ task: MockTask) -> String? {
@@ -588,6 +628,14 @@ struct TaskDetailView: View {
             return .neutral
         case .done:
             return .success
+        }
+    }
+
+    private func toggleChecklist(_ index: Int) {
+        if checkedChecklistIndexes.contains(index) {
+            checkedChecklistIndexes.remove(index)
+        } else {
+            checkedChecklistIndexes.insert(index)
         }
     }
 

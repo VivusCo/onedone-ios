@@ -63,6 +63,7 @@ struct AppFlow: View {
 private struct MainTabShell: View {
     @Bindable var appState: AppState
     @State private var showTaskComposer: Bool = false
+    @State private var isKeyboardVisible: Bool = false
 
     private enum ShellLayout {
         static let barHeight: CGFloat = 60
@@ -109,47 +110,55 @@ private struct MainTabShell: View {
         }
         .toolbar(.hidden, for: .tabBar)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            ZStack(alignment: .top) {
-                RoundedRectangle(cornerRadius: 34, style: .continuous)
-                    .fill(ODColor.surfaceNav.opacity(0.98))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .fill(ODColor.glassFillPrimary.opacity(0.55))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 34, style: .continuous)
-                            .stroke(ODColor.borderCard.opacity(0.92), lineWidth: 0.9)
-                    )
-                    .shadow(color: ODColor.shadowSoft.opacity(0.7), radius: OneDoneStyle.panelShadowRadius, x: 0, y: OneDoneStyle.panelShadowYOffset)
-                    .frame(height: ShellLayout.barHeight)
-                    .padding(.top, ShellLayout.barTopInset)
+            if shouldShowCustomBottomBar {
+                ZStack(alignment: .top) {
+                    RoundedRectangle(cornerRadius: 34, style: .continuous)
+                        .fill(ODColor.surfaceNav.opacity(0.98))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                                .fill(ODColor.glassFillPrimary.opacity(0.55))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 34, style: .continuous)
+                                .stroke(ODColor.borderCard.opacity(0.92), lineWidth: 0.9)
+                        )
+                        .shadow(color: ODColor.shadowSoft.opacity(0.7), radius: OneDoneStyle.panelShadowRadius, x: 0, y: OneDoneStyle.panelShadowYOffset)
+                        .frame(height: ShellLayout.barHeight)
+                        .padding(.top, ShellLayout.barTopInset)
 
-                HStack(spacing: 0) {
-                    tabItem(for: .home)
-                    tabItem(for: .tasks)
+                    HStack(spacing: 0) {
+                        tabItem(for: .home)
+                        tabItem(for: .tasks)
 
-                    Spacer(minLength: 0)
-                        .frame(maxWidth: .infinity)
+                        Spacer(minLength: 0)
+                            .frame(maxWidth: .infinity)
 
-                    tabItem(for: .templates)
-                    tabItem(for: .settings)
+                        tabItem(for: .templates)
+                        tabItem(for: .settings)
+                    }
+                    .padding(.horizontal, ShellLayout.barHorizontalPadding)
+                    .padding(.top, ShellLayout.barTopInset + 8)
+
+                    ElevatedTaskTabButton(
+                        accessibilityLabel: "Create task"
+                    ) {
+                        showTaskComposer = true
+                    }
+                    .offset(y: ShellLayout.centerButtonTopOffset)
                 }
-                .padding(.horizontal, ShellLayout.barHorizontalPadding)
-                .padding(.top, ShellLayout.barTopInset + 8)
-
-                ElevatedTaskTabButton(
-                    accessibilityLabel: "Create task"
-                ) {
-                    showTaskComposer = true
-                }
-                .offset(y: ShellLayout.centerButtonTopOffset)
+                .frame(height: ShellLayout.insetHeight)
+                .padding(.horizontal, OneDoneStyle.space20)
+                .padding(.bottom, ShellLayout.barBottomPadding)
             }
-            .frame(height: ShellLayout.insetHeight)
-            .padding(.horizontal, OneDoneStyle.space20)
-            .padding(.bottom, ShellLayout.barBottomPadding)
         }
         .sheet(isPresented: $showTaskComposer) {
             TaskComposerSheet(appState: appState)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            isKeyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            isKeyboardVisible = false
         }
         .onAppear {
             // iOS 17+ can still render the native TabView bar in some layouts even when hidden via toolbar APIs.
@@ -159,6 +168,10 @@ private struct MainTabShell: View {
         .onDisappear {
             UITabBar.appearance().isHidden = false
         }
+    }
+
+    private var shouldShowCustomBottomBar: Bool {
+        !showTaskComposer && !isKeyboardVisible
     }
 
     private func tabItem(for tab: AppTab) -> some View {
